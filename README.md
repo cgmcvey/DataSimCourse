@@ -15,14 +15,14 @@ By the end of the course, students will be able to:
 ## Course Schedule 
 
 [Week 1: Course Intro & Review of Data Structures](https://cgmcvey.github.io/DataSimCourse/Lecture1_CodeReview.html) \
-Week 2: Data Visualization \
-Week 3: Basics of Parametric Simulations: Discrete Data \
-Week 4: Basics of Parametric Simulations: Continuous Data \
-Week 5: Basics of Parametric Simulations: Monte Carlo Simulations \
-Week 6: Basics of Nonparametric Permutation: Intro to Permutation \
-Week 7: Basics of Nonparametric Permutation: Permutation Tests \
-Week 8: Basics of Nonparametric Permutation: Bootstrapping \
-Week 9: Basics of Nonparametric Permutation: Jack-Knifing \
-Week 10: Data Augmentation: Missing Values
-Week 11: Data Augmentation: Biased Sampling \
-Week 12: Data Augmentation: Mimicking Complex Error Structures \
+[Week 2: Data Visualization](https://cgmcvey.github.io/DataSimCourse/Lecture2_DataViz.html) \
+[Week 3: Basics of Parametric Simulations: Discrete Data](https://cgmcvey.github.io/DataSimCourse/Lecture3_DiscreteParametricSim.html) \
+[Week 4: Basics of Parametric Simulations: Continuous Data](https://cgmcvey.github.io/DataSimCourse/Lecture4_ContinuousDistRmd.html) \
+[Week 5: Basics of Parametric Simulations: Monte Carlo Simulations](https://cgmcvey.github.io/DataSimCourse/Lecture5_MonteCarlo-Simulation.html) \
+[Week 6: Basics of Nonparametric Permutation: Intro to Permutation](https://cgmcvey.github.io/DataSimCourse/Lecture6_Permutation-MissingValues.html) \
+[Week 7: Basics of Nonparametric Permutation: Permutation Tests](https://cgmcvey.github.io/DataSimCourse/Lecture7_MorePermutations.html) \
+[Week 8: Basics of Nonparametric Permutation: Bootstrapping](https://cgmcvey.github.io/DataSimCourse/Lecture8_Bootstrapping.html) \
+[Week 9: Basics of Nonparametric Permutation: Jack-Knifing](https://cgmcvey.github.io/DataSimCourse/Lecture9_Jacknifing.html) \
+[Week 10: Data Augmentation: Missing Values](https://cgmcvey.github.io/DataSimCourse/Lecture10_Missing-Values.html) \
+[Week 11: Data Augmentation: Biased Sampling](https://cgmcvey.github.io/DataSimCourse/Lecture11_DomainConstraints.html) \
+[Week 12: Data Augmentation: Mimicking Complex Error Structures](https://cgmcvey.github.io/DataSimCourse/Lecture12_SamplingBias.html) \
