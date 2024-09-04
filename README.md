@@ -14,7 +14,7 @@ By the end of the course, students will be able to:
 
 ## Course Schedule 
 
-Week 1: Course Intro & Review of Data Structures 
+Week 1: Course Intro & Review of Data Structures  \n
 Week 2: Data Visualization
 Week 3: Basics of Parametric Simulations: Discrete Data
 Week 4: Basics of Parametric Simulations: Continuous Data
