@@ -14,7 +14,7 @@ By the end of the course, students will be able to:
 
 ## Course Schedule 
 
-[Week 1: Course Intro & Review of Data Structures](https://github.com/cgmcvey/DataSimCourse/blob/main/Lecture1_CodeReview.html) \
+Week 1: Course Intro & Review of Data Structures \
 Week 2: Data Visualization \
 Week 3: Basics of Parametric Simulations: Discrete Data \
 Week 4: Basics of Parametric Simulations: Continuous Data \
