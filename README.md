@@ -11,4 +11,3 @@ By the end of the course, students will be able to:
 3.	After identifying a complex stochastic structure or evidence of sampling bias, students will be able to select the most appropriate nonparametric permutation or parametric simulation technique to use in extracting robust and reliable statistical inference. 
 4.	Understand the opportunities, limitations, and potential pitfalls of data augmentation and imputation techniques.
 5.	Effectively communicate all analytical choices made in developing a simulation, and clearly explain their relative merits and potential shortcomings.
-![image](https://github.com/user-attachments/assets/d8d69928-c5a8-4217-9370-354bd42401c8)
