@@ -3,7 +3,8 @@ Course Materials for Introduction to Data Simulation, Permutation, and Augmentat
 
 Description: Students will be introduced to a range of techniques from computational statistics frequently encountered in big data and machine learning. Through case studies students will learn to identify sampling biases commonly encountered in real world data sets. Students will then explore how to overcome these data deficits to extract reliable data inferences through permutation testing, nonparametric imputation, and parametric data simulation and biases correction techniques. Course materials will emphasize a conceptual understanding of these topics. Course content will be delivered in R.
 
-Learning Outcomes. By the end of the course, students will be able to:
+##Learning Outcomes. 
+By the end of the course, students will be able to:
 
 1.	Intuitively understand the various types of sampling biases that can occur in real world data sets and the risk they pose to extracting reliable inferences.
 2.	Identifying when standard approaches to statistical inferences may fail, and predict how violation of these statistical assumptions may mislead subsequent inferences
