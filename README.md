@@ -11,3 +11,19 @@ By the end of the course, students will be able to:
 3.	After identifying a complex stochastic structure or evidence of sampling bias, students will be able to select the most appropriate nonparametric permutation or parametric simulation technique to use in extracting robust and reliable statistical inference. 
 4.	Understand the opportunities, limitations, and potential pitfalls of data augmentation and imputation techniques.
 5.	Effectively communicate all analytical choices made in developing a simulation, and clearly explain their relative merits and potential shortcomings.
+
+## Course Schedule 
+
+●	Week 1: Course Intro & Review of Data Structures 
+●	Week 2: Data Visualization
+●	Week 3: Basics of Parametric Simulations: Discrete Data
+●	Week 4: Basics of Parametric Simulations: Continuous Data
+●	Week 5: Basics of Parametric Simulations: Monte Carlo Simulations (*Guest Instructor)
+●	Week 6: Basics of Nonparametric Permutation: Intro to Permutation
+●	Week 7: Basics of Nonparametric Permutation: Permutation Tests
+●	Week 8: Basics of Nonparametric Permutation: Bootstrapping
+●	Week 9: Basics of Nonparametric Permutation: Jack-Knifing
+●	Week 10: Data Augmentation: Missing Values (*Virtual)
+●	Week 11: Data Augmentation: Biased Sampling
+●	Week 12: Data Augmentation: Mimicking Complex Error Structures
+![image](https://github.com/user-attachments/assets/9845d63f-9a7e-45cd-ab42-29f47de11190)
