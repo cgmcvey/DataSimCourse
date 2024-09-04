@@ -25,4 +25,4 @@ By the end of the course, students will be able to:
 [Week 9: Basics of Nonparametric Permutation: Jack-Knifing](https://cgmcvey.github.io/DataSimCourse/Lecture9_Jacknifing.html) \
 [Week 10: Data Augmentation: Missing Values](https://cgmcvey.github.io/DataSimCourse/Lecture10_Missing-Values.html) \
 [Week 11: Data Augmentation: Biased Sampling](https://cgmcvey.github.io/DataSimCourse/Lecture11_DomainConstraints.html) \
-[Week 12: Data Augmentation: Mimicking Complex Error Structures](https://cgmcvey.github.io/DataSimCourse/Lecture12_SamplingBias.html) \
+[Week 12: Data Augmentation: Mimicking Complex Error Structures](https://cgmcvey.github.io/DataSimCourse/Lecture12_SamplingBias.html) 
