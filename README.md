@@ -20,7 +20,7 @@ Week 3: Basics of Parametric Simulations: Discrete Data \
 Week 4: Basics of Parametric Simulations: Continuous Data \
 Week 5: Basics of Parametric Simulations: Monte Carlo Simulations \
 Week 6: Basics of Nonparametric Permutation: Intro to Permutation \
-Week 7: Basics of Nonparametric Permutation: Permutation Tests 
+Week 7: Basics of Nonparametric Permutation: Permutation Tests \
 Week 8: Basics of Nonparametric Permutation: Bootstrapping \
 Week 9: Basics of Nonparametric Permutation: Jack-Knifing \
 Week 10: Data Augmentation: Missing Values \
