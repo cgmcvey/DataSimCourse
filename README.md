@@ -23,6 +23,6 @@ Week 6: Basics of Nonparametric Permutation: Intro to Permutation \
 Week 7: Basics of Nonparametric Permutation: Permutation Tests \
 Week 8: Basics of Nonparametric Permutation: Bootstrapping \
 Week 9: Basics of Nonparametric Permutation: Jack-Knifing \
-Week 10: Data Augmentation: Missing Values \
+Week 10: Data Augmentation: Missing Values
 Week 11: Data Augmentation: Biased Sampling \
 Week 12: Data Augmentation: Mimicking Complex Error Structures \
