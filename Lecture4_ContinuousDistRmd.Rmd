@@ -1,0 +1,205 @@
+---
+title: 'Lecture 4: Continuous Probability Distributions'
+author: "Catie McVey"
+date: "2023-09-12"
+output: html_document
+---
+
+
+# Intro 
+
+All right, so last week we went over the discrete probability distributions, and reviewed some use cases for use cases that can be built from binary outcomes and for countable data. 
+
+This week we're going to go over continuous data - any data that can (hypothetially) be measured down to a decimal point. Unfortunately, our family of continuous distributions aren't quite so inter-connected as the discrete family, but they do allow for as much flexibility in shape bounded only by your creativity. 
+
+
+# Normal Distribution
+
+Many biological phenomena assume a bell shaped curve. Does anyone know why? (Hint: Its related to a distribution we learned last week). 
+
+That makes the normal distribution our work horse for many simulations, especially in scientific applications. Its unimodal, symmetric, and can be defined by two simple and intuitive shape parameters: the center (mean), and the spread (sd). It is particularly convenient that 95% of all observations fall within +/-3 standard deviations of the mean, making it easy to calculate the spread term from basic assumptions. 
+
+So, for example, if we knew that the average birth weight of a calf is 75 lbs, and that we seldom see a calf less than 60 lbs, or over 90, we can easily parameterize an assumed reference distribution using a normal distribution with mean 75 and sd = (90-60)/6
+
+```{r}
+
+qplot(rnorm(1000, mean = 75, sd = 5))
+
+```
+
+So, what could go wrong with this distribution?
+
+While its convenient to only have to name two shape parameters, its not always realistic. To use the normal, we really need to be able to assume a distribution is symmetrically distributed, so there's not really a third moment to worry about. But there's also the fourth moment - skew. Skew is how thick the tails of the distribution are. 
+
+While the central limit theorem brings the average of most bell(ish) shaped curves to the normal quickly, most data you encounter "in the wild", particularly in biological examples, will be "over-dispersed", or have thicker than anticipated tails. This can often be seen at the edges of qqnorm plots (although you should also note that the resolution of quantiles goes down quickly at the extremes of any distribution).
+
+```{r}
+
+hist(iris$Sepal.Width)
+qqnorm(iris$Sepal.Width)
+qqline(iris$Sepal.Width, distribution = qnorm)
+
+```
+
+We can fix this by using a distribution with a thicker tail, like t-distribution. But the assumptions made to validate such sampling decisions often become pretty vague. And while there is nothing wrong with empirically-driven simulation decisions, most such dispersion often arises in data where you have multiple competing mechanisms simultaneously influencing the observed value. I would encourage you to always press your domain area expertise to find a systematic explanation for over dispersion, and built such mechanisms into your simulations - techniques we're going to go over next week. 
+
+The other problem that can arise with the normal distribution is that all numbers are technically possible - that includes negative numbers. In our example with calf weights, it would be very rare to draw a negative value from our simulated calving weight curve, but it is possible. That could create logistical problems in downstream components of a multi-layered simulation and throw an error. While you could hypothetically just throw in an try-catch or ifelse statement to catch this rare case and set to zero, can you think of a probabilistic reason why that might be a problem? If you have data that naturally can't be zero, you are better off using a distribution that naturally contains such domain constraints. 
+
+# Gamma Distribution
+
+The gamma distribution is arguably the most flexible in our arsenal of continuous distributions. It is defined by two parameters: 1) shape, and 2) rate or scale (where scale = 1/rate). 
+
+The mean of the gamma is shape * rate
+The variance of gamma is shape * rate ^2 
+Skew is controlled by the shape parameter - the farther from zero, the more room it has to be symmetric, but the closer you push it to zero the more scewed it will become.
+
+So we could model our calf birth weights as. Does that look reasonable?  
+
+```{r}
+
+hist(rgamma(1000, shape = 75, scale = 1))
+
+```
+
+But if our cows had come out smaller - maybe bc the mothers are heat stressed -  but the same variability in weights, then we'd see more upward skew
+
+```{r}
+hist(rgamma(1000, shape = 10, scale = 1))
+```
+
+You may be thinking - well those parameters seem really arbitrary and unintuitive. And yep, you would be right! While I have come across many datasets that should have been modeled as a gamma and not a normal to accommodate the domain constraints and skew of a dataset, I'm not sure I've ever run across many cases where there are compelling intuitive interpretations of gamma parameters. In practice, if you need a gamma, you probably need to fit a distribution to some reference data. 
+
+We don't have time to go down the rabbit whole of distribution fitting in this class. Fortunately R has built in packages that generally do this pretty well. But I will offer this warning - when it comes to estimating a distribution, you don't have the CLT to swoop in an save you when you only have a handful of datapoints. To get reasonable paramter estimates, you will need a large number of samples! Think at least several hundred. 
+
+```{r}
+
+set.seed(61916)
+library(fitdistrplus)
+
+fit <- fitdist(rgamma(100, shape = 5, scale = 2), distr = "gamma", method = "mle")
+summary(fit)$estimate
+
+fit <- fitdist(rgamma(300, shape = 5, scale = 2), distr = "gamma", method = "mle")
+summary(fit)$estimate
+
+fit <- fitdist(rgamma(1000, shape = 5, scale = 2), distr = "gamma", method = "mle")
+summary(fit)$estimate
+
+```
+The exceptions to this rule of course are the special cases of the gamma. The first is the exponential distribution, which is just a heavily skewed gamma with shape = 1
+
+```{r}
+
+hist(rgamma(1000, shape = 1, scale = 1))
+hist(rgamma(1000, shape = 1, scale = 5))
+hist(rgamma(1000, shape = 1, scale = 10))
+
+
+```
+
+And then of course there is the chi squared, which can be quite handy in simulating variance terms, and is simply a gamma with a scale = 2 and shape = df/2
+
+```{r}
+
+set.seed(61916)
+hist(rgamma(1000, shape = 5/2, scale = 2))
+set.seed(61916)
+hist(rchisq(1000, df = 5))
+
+```
+
+# Beta
+
+Alright, so we've got the normal with no domain constraints, the gamma for a domain constraint greater than zero, so what if we've got upper and lower bounds to deal with? Such constraints often come up with data sets where there are temporal or spatial restrictions. 
+
+The beta distribution ranges from 0 to 1, so by default it works great for probability distributions. For applications with a wider but still constrained range, the "textbook" beta can be used by normalizing the data (or denormalizing the beta). 
+
+The beta is ultimately quite flexible in shape - ranging from highly skewed to perfectly symmetric. It is defined using two parameters - alpha and beta. The ratio of the parameters determines the direction of skew while their range influences the flatness of the distribution. 
+
+```{r}
+
+hist(rbeta(1000, 2, 5))
+hist(rbeta(1000, 5, 2))
+
+hist(rbeta(1000, 2, 2))
+hist(rbeta(1000, 5, 5))
+
+hist(rbeta(1000, 0.5, 0.5))
+
+```
+
+Last week we talked about using the multinational for un-normalized count data divided into multiple categories. For applications with two discrete categories, it might be tempting to normalize the data and represent it as a beta. This is typically not a good idea. When you normalize you loose information about the scale of the sampling. A set of proportions calculated over 1000 samples you can imagine will be far more reliable than a set of proportions calculated over 10 samples, right? Using the multinomial will allow you to retain this information and the relative uncertainty it conveys. Where possible, only use the beta where the underlying distribution can't be expressed as a count.
+
+Where else can the beta come in handy? Do you remember last week the main weakness of the multinomial - that uncertainty is often under-estimated at the boundaries of the distributions domain. One way to infuse additional variance into a model is to infuse stochastic into your simulation not only in how counts fall into your categories for a given underlying probability distribution, but also allow for stochastic in your underlying probability distribution. If you are dealing with a multinomial with more than two categories, you can generalize the beta to however many categories you want by drawing from a dirichlet distribution. We'll go over an example of this next week.
+
+
+# HW
+
+To get more comfortable with our new cadre of probabilistic pals, lets write to simulations to check just how well you understand the Central Limit Theorem (CLT).
+
+Start by writing your own function will take a reference population, which you will provide as a vector of samples. You function should then randomly sample (without replacement) a sample of size n from that larger population and take the average. Repeat this subsampling and averaging routine B times, keeping track of the average computed from each subsample. Return a vector of the subsample averages
+
+```{r}
+
+myCLT <- function(){
+  
+}
+
+```
+
+
+
+## The Normal 
+
+Start by creating a reference population of 1000 individuals sampled from a normal with mean 5 and sd 1. Feed this reference population into your CLT function, and create a histogram of the sample means over B=1000 subsamples. Do this for sample size 5, sample size 10, sample size 30, and sample size 100. What is the pattern here? Does this jive with what you know about the CLT?
+
+```{r}
+
+
+
+```
+
+
+
+## The Beta
+
+Repeat what you did above, but this time use a beta distribution of alpha = 2, and beta = 2 for your reference distribution. What pattern are you seeing.
+
+```{r}
+
+
+
+```
+
+
+Ok, now try using a beta with alpha = 2 and beta = 5. What pattern are you seeing, can you tell be why its behaving this way?
+
+```{r}
+
+
+```
+
+
+Ok, now try using a beta with alpha = 0.5 and beta = 0.5. What pattern are you seeing, can you tell be why its behaving this way?
+
+
+
+## Gamma
+
+Finally, use the gamma as your reference distribution. What parameterization will require the largest subsample to get the distributions back to something looking normal. Explain your logic, but back it up with a few simulations.  
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+

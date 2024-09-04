@@ -1,0 +1,339 @@
+---
+title: 'Lecture 7: Named Permutation Tests'
+author: "Catie McVey"
+date: "2023-10-3"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+Alright, so last week were introduced to permutation as a non-parametric approach to mimicking sampling uncertainty. We saw how a permutation test framework can allow us to draw reliable inferences even when the reference population is poorly characterized. This is partly acheived by using set theory to circumvent having to assume our reference distribution is well represented by a named reference distribution. But also, because we are not forced to fall back on the CLT, we are no longer forced to think about everything being represented by a mean. 
+
+Being free to use any summary statistic we desire to construct a hypothesis test is incredibly liberating. It affords an incredible amount of freedom to craft our statistical analyses to better fit our experimental system. Such freedom, however, must be balanced with discretion. While the selection of summary statistic may at times be determined by the experimental context (ie - the most intutive summarization of the data), we must also balance that with efficacy. 
+
+We could spend several weeks digging into the relative efficacy of estimators and tests, but is better left to a graduate level course in nonparametric statistics. Today we'll simply review a handful of named nonparametric tests that show superior performance under a wider range of experimental conditions, at least where nuanced summary statistics are not called for. 
+
+
+# Wilcoxon Ranked-Sum Test
+
+Lets return to our example from last week. Recall that we have 50 cows, which we may split into two equal sized test groups, to determine if a new feed additive improves weight gain. Weight gain is distributed normally, but there is also a risk that cows will contract a disease and die while participating in our feed trial. Last week we showed that simply excluding those records from our analyses can lead to dangerous false positive inferences. But adding our missing cows in with zeros as place holders destabilized our inferences when we tried to use a mean-based test. We showed how switching to the median, which is an order statistic, was more stable in the presence of these outliers. In fact, one could argue that its almost too stable.... 
+
+Consider a smaller example. Lets say we only had nine cows on trial, and we arrange them in order from smallest to largest weights. By definition, the median of this sample will simply be the value of the fifth cow in that ranked order. Unlike with a mean, the weight values of all the other cows become practically irrelevant, beyond assigning order. If you visualize these cows spread out along a number line, their observed values could move and shift around to assume any shape or range you could image, but as long as four animals remain heavier and four cows remain lighter than our middle animal, the median will never change. Thus, while a median is very resilient measure of center in the presence of outlines, it also hemorrhages a lot of information about the distribution of our observation, and where we loose detail we are sure to lose power. 
+
+The wilcoxon ranked sum test is designed to let us have our cake and eat it to - be resilient to outlive and extreme values by utilizing order statistics, but retain more information about the dataset than a simple median. 
+
+The basic idea is this: All observed values are lumped together and are ordered from highest to lowest, and assigned a rank order (ie - an integer from 1 to n). 
+
+R(X_i) = number of X_j <= X_i
+
+In the WRS test, you permute the test/control identities under the null as before, but for the test statistic you compare the sum of the ranks for either group. 
+
+*Note: Make sure you are using rank() to get the rank order value of each observation. If you use order() by mistake it gives you an integer value that can be used to reorder your vector*
+
+```{r}
+
+set.seed(61916)
+
+# Simulate Cows
+
+n <- 25
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+
+trt <- rnorm(n, mean = 510, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,0,x) )
+
+# Run WRS Test
+
+myWRSTest <- function(cont,trt, B){
+  
+  samp <- c(cont, trt)
+  samp_rank <- rank(samp)
+  
+  obsRS_cont <- sum(samp_rank[1:length(cont)])
+  obsRS_trt <- sum(samp_rank[(length(cont)+1): length(samp_rank)])
+  
+  nullRS_cont <- rep(NA, B)
+  nullRS_trt <- rep(NA, B)
+  for(b in 1:B){
+    
+    temp <- sample(samp_rank)
+    nullRS_cont[b] <- sum(temp[1:length(cont)])
+    nullRS_trt[b] <- sum(temp[(length(cont)+1): length(samp_rank)])
+    
+  }
+  
+  return(list(ObsRS_Treatment = obsRS_trt, NullRS_Treatment = nullRS_trt))
+  
+  
+}
+
+WRSout <- myWRSTest(cont,trt, 2000)
+qplot(WRSout$NullRS_Treatment) + geom_vline(xintercept = WRSout$ObsRS_Treatment, color = 'red')
+sum(WRSout$ObsRS_Treatment >= WRSout$NullRS_Treatment)/2000
+
+
+```
+
+Ok, pretty straight forward right? Well, there are complications. For example - what happens when you have ties. The standard approach is to "split the ties", which mean you simply assign to all tied values the average or the ranks they span. This is a bit of a pain to code, so lets shift over to the built-in WRS test in R
+
+```{r}
+
+set.seed(61916)
+
+# Simulate Cows
+
+n <- 25
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+
+trt <- rnorm(n, mean = 510, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,0,x) )
+
+# Run WRS Test
+
+
+wilcox.test(cont, trt, alternative = 'greater')
+
+```
+
+
+# Mann-Whitney Test
+
+If you come across nonparametric analyses in your future, you may also here someone say they have run Mann-Whitney test on their two sample hypothesis. 
+
+In this test, ranks are not calculated for either sample. Instead the test statistic is simply the total number of pairwise combinations where between the control and treatment samples where the observed value in the control group is lesser/greater than the treatment group (depending on what tail you want to test).
+
+You may be thinking that this test is a fair bit less intuitive and seemingly more computationally cumbersome than the wilcoxon. And you'd probably be right. But if you do some math, it turns out that these two tests statistics acutally lead to equivalent tests. 
+
+The only real advantage is that the Mann-Whitney test also set you up to calculate a confidence interval. If you want to assume that the difference between your two distributions is a shift in the center
+
+F(x) = F(y-`delta`)
+
+Then if you find all pairwise combinations of control and treatment observations and calculate the difference, you can use the resulting distribution, called the U distribution, to calculate the confidence interval for the observed shift
+
+```{r}
+
+wilcox.test(cont, trt, alternative = 'greater', conf.int = T, conf.level = 0.95)
+
+```
+
+Unfortunately, in practice, if you have a sample with a lot of ties (like a bunch of place holder zeros), you often don't get a decent estimate of the mean shift.
+
+While its typically encouraged to report a confidence interval and not just a mean and p-value in order to better convey a scene of scale/certainty, I would personally argue that a visualization of the null distribution contrasted witht the observed value is a more meaningful way to convey such information in the context of these nonparametric tests. 
+
+
+# Siegel-Tukey Test
+
+Remember in the early lectures when we discussed setting the seed. We said it was often convienet with stochastic simulations to return a consistent answer. But I warned not to be tempted to tweak your seed to get the result you want. Well, here's where I admit that that is exactly what I did. 
+
+Lets go back to the WRS results for the scenario where treatment improves weight gain on average 10lbs, but increases the risk of death from a baseline 10% all the way up to 50%. Run this simulated experiment a handful of times. Notice anything about the result?
+
+```{r}
+
+
+# Simulate Cows
+
+n <- 25
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+
+trt <- rnorm(n, mean = 510, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,0,x) )
+
+# Run WRS Test
+
+
+wilcox.test(cont, trt, alternative = 'greater')
+
+
+
+```
+Most times your run this experiment, you get a significant or at least a nearly significant result. But not all the time. Can you think why?
+
+The preceding tests were optimized to detect shifts in the reference distributions. But that's not what's going on here, right - we've got a shift in mean one direction for healthy cows, and a shift way the other direction for those getting sick. Two competing mechanisms. And one of those mechanisms is discrete. When only sampling 25 animals, there's still a lot of variability in the sampled rate of sickness, and that is infusing a lot of instability into this test for shift, since at its core that's not really a very effective way to describe this system. So can we reframe our test to better capture this dynamic?
+
+We saw that the addition of zeros to the otherwise normal distribution completely obscured the standard t-test because it inflated the variance. So why not just do a test for variance? Well, this still isn't a normal distribution, or even unimodal, so we would be violating any type of standard chisquared or F test. But we can use the nonparametric permutation framework to test more generally for differences in spread.
+ 
+As you would expect with anything named after Tukey, the Sigel-Tukey test is quite clever. As with the wilcox test, all observed values are pooled and ordered from highest to lowest. With this test however, they are not ranked from highest to lowest. Instead you start by giving the smallest value a rank of 1. Then the largest observed value a rank of 2. Then the second smallest value a rank of 3. And the second highest value a rank of 4. And so on. You then sum the ranks of the two treament groups and compare. If one group has significantly more spread, then it will subseqently have a significantly lower rank sum. And no where in there did we make an assumption about the distribution of the two samples. 
+
+```{r}
+
+library(DescTools)
+set.seed(6191)
+
+# Simulate Cows
+
+n <- 25
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+
+trt <- rnorm(n, mean = 510, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,0,x) )
+
+# Run ST Test
+
+SiegelTukeyTest(cont, trt, alternative = 'less')
+  
+```
+
+So, you'll see that we didn't get a significant result. 
+
+Try it a few more times on different seeds, and what do you see. We're getting a result at roughly the same consistency as with the tests for shifts in mea right. 
+
+Well, I hate to be the bearer of bad news, but part of the answer for this result is that even if you pick out the perfect test, you cannot infuse power into an analyses that simply isn't there. A sample of 25 cows would be a small sample with witch to estimate variance/spread for any distribution. So for a binomial, there's still going to be a lot of uncertainty in the observed spread just from sampling fluctuations. Lets try this test a few times with 100 cows in either group. 
+
+```{r}
+
+library(DescTools)
+
+
+# Simulate Cows
+
+n <- 100
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+
+trt <- rnorm(n, mean = 510, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,0,x) )
+
+# Run ST Test
+
+SiegelTukeyTest(cont, trt, alternative = 'less')
+  
+```
+
+A bit more consistent. But still kinda finicky right? Anything left in the nonparametric arsenal to throw at it? 
+
+# The Omnibus Test (The KS Test)
+
+So, for this biological system, we've got two things happening at the same time. We do have a mean shift, but that is getting obscured/destabilized by this bionomial sickness dynamic. And the the sickness dynamic, while it is adding a lot of uncertainty to the data, maybe is maybe better described as adding a bimodal dynamic than it is described as increasing "spread". So its not so much a test of shift or a shift of spread that we need, right, but a more comprehensive difference in these two reference distributions. 
+
+That is where the Kolmogorov-Smirnov (or KS) Test comes in. Again, its pretty clever. To compare the two distributions, you begin by calcultating the cumulatve CDF of either sample. The test statistic for the test then becomes the sum of the difference between those two CDFs. This is visualized by the integral of the vertical differences between their respective CDF plots. 
+
+![KSTest](kstestviz.png)
+If the two groups have similar distributions, their CDFs will be pretty much overlapping, excluding some sampling flucturations. But if the distributions differ significantly in any moment - center, spread, tail - then this cumulative difference will become high in the observed sample, significantly higher compared with the CDFs for the two randomly mixed groups. 
+
+So lets test this dataset one more time
+
+```{r}
+
+#set.seed(61916)
+
+# Simulate Cows
+
+n <- 25
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+
+trt <- rnorm(n, mean = 510, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,0,x) )
+
+
+ks.test(cont,trt)
+
+```
+
+Righto. So now, with this test, we are getting significant differences with nearly every sample from the reference population. 
+
+Hopefully this case study has demonstrated that, while a nonparametric test is in general more resilient to deviations from standard statistical assumptions, its not a one-size-fits all tools. We still need to craft our analyses/hypotheses to fit our experimental system if we want to realize the full power of theses tests, particularly when sample sizes are low. Luckily, because an assumption-light permutation-based framework places few restrictions on the estimators we can test for, nonparametric statistics gives us that much more room to tailor our analyses (and not an excuse to get lazy). 
+
+
+# HW
+
+So now that we've explored how we can tailor our nonparametric tests to our experimental system to maximize power, lets now compare the power of nonparametric tests and standard parametric paired sample test
+
+## Part 1 - Normal Reference Distributions
+
+Lets start a two sample test for difference in shift parameters where the two reference distributions are normal. Lets Sample A be normally distributed with mean of 10 and a sd of 2. Lets Sample B be normally distributed with mean 11 and sd 2. What is the relative power of a t-test one-sided and a WRS test when applied to these two reference populations. 
+
+Find the power (proportion of tests with signficant results at alpha = 0.05) for either test over 1000 simulated experiments for a given sample size. Do this for sample sizes from n=seq(5,100, 5). When your done plot the power by sample size result for either test. Do you notice any difference?
+
+
+```{r}
+
+tresult <- c()
+wresult <- c()
+for(n in seq(5,100, 5)){
+  tout <- rep(NA, 1000)
+  wout <- rep(NA, 1000)
+  for(i in 1:1000){
+    SampA <- rnorm(n, 10, 2)
+    SampB <- rnorm(n, 11, 2)
+    
+    tout[i] <- ifelse(t.test(SampA, SampB, alternative = 'less')$p.value<0.05,1,0)
+    wout[i] <- ifelse(wilcox.test(SampA, SampB, alternative = 'less')$p.value<0.05,1,0)
+    
+  }
+  
+  tresult <- c(tresult, sum(tout)/length(tout))
+  wresult <- c(wresult, sum(wout)/length(tout))
+  
+}
+
+qplot(seq(5,100, 5), tresult, ylim = c(0,1)) 
+qplot(seq(5,100, 5), wresult, ylim = c(0,1)) 
+
+```
+
+
+
+# Part 2 - Gamma Dist
+
+Repeat the power analysis that you completed in part 1. But this time lest use gamma-distributed. Let both samples be distributed gamma(5,0.5) but let sample B be shifted up 2 units. Plot the results of your power analyses. Do you notice any difference. 
+
+```{r}
+
+tresult <- c()
+wresult <- c()
+for(n in seq(5,100, 5)){
+  tout <- rep(NA, 1000)
+  wout <- rep(NA, 1000)
+  for(i in 1:1000){
+    SampA <- rgamma(n, 5, 0.5) 
+    #hist(SampA)
+    SampB <- rgamma(n, 5, 0.5) + 2
+    
+    
+    tout[i] <- ifelse(t.test(SampA, SampB, alternative = 'less')$p.value<0.05,1,0)
+    wout[i] <- ifelse(wilcox.test(SampA, SampB, alternative = 'less')$p.value<0.05,1,0)
+    
+  }
+  
+  tresult <- c(tresult, sum(tout)/length(tout))
+  wresult <- c(wresult, sum(wout)/length(tout))
+  
+}
+
+hist(SampA)
+hist(SampB)
+
+qplot(seq(5,100, 5), tresult, ylim = c(0,1)) 
+qplot(seq(5,100, 5), wresult, ylim = c(0,1)) 
+
+```
+
+
+
+

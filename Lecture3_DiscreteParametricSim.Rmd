@@ -1,0 +1,282 @@
+---
+title: 'Lecture 3: Discrete Parametric Simulations'
+author: "Catie McVey"
+date: "2023-09-4"
+output: html_document
+---
+
+
+```{r}
+
+library(tidyverse)
+
+```
+
+
+# Intro
+
+Alright, now that we know how to visually inspect our simulations, so that we can both inspect and communicate our results, lets start to build our toolkit of simulation techniques. 
+
+We're going to start off with parametric simulation techniques. That is ultimately just a fancy way to say that we are going to randomly draw samples from a known distribution that can be explicitely defined by some set of parameters.
+
+Being a programing language specifically geared toward statistical programming, R makes it easy to work with a wide range of statistical distributions. So lets quickly review that syntax. For a given distribution, which will usually be referenced  using a shorthand, there are typically four functions availiable.
+
+d___(x, params) = density of reference distribution at a given observational value
+p___(x, params) = cumulative probability of reference distribution at a given observational value (defaults to left tail probability)
+q___(p, params) = value of observational value at a qiven quantile for the reference distribution (defaults to left tail probability)
+rnorm(n, params) = generate n random samples from reference distribution
+
+To see how these work, lets take a look at our old friend the normal distribution
+
+```{r}
+
+set.seed(61916)
+
+pnorm(0, mean = 0, sd = 1)
+qnorm(0.5, mean = 0, sd = 1)
+dnorm(0, mean = 0, sd = 1)
+
+hist(rnorm(1000, mean = 0, sd = 1))
+
+
+```
+
+
+You might have noticed in the previous chunk, and in other examples in this class so far, that I've called a function called set.seed(), but it doesn't return anything to the console. So what is it doing. We're not going to go too deep into the finer details of how R generated random samples in this class, but the basic idea is that under the hood R has a really big table of radom numbers that it can pull from to create a sample. Normally, it starts a radom place in that table, so each pull from the referenace distribution won't be identical
+
+```{r}
+
+dista <- rnorm(1000, mean = 0, sd = 1)
+distb <- rnorm(1000, mean = 0, sd = 1)
+qqplot(dista, distb)
+
+```
+
+But that can create a bit of a logistical headache when you try to create reports for a stochastic simulation. You might run everythig in Rstudio, and write about results of your simulations - maybe you get a p value of 0.031. But then when you go to compile the markdow, everything gets rerun from a different position in the random number table, and you get a new pvalue of 0.033 - same inference in this case, but it'll look sloppy. Or maybe you get a error the first time you run a sim, and then you can't reproduce it the next three times you run it because its a different sample with different sample. The function set.seed() simply forces R to start at a specific index in its random number table, so that you can get a random sample of points, but  it will be the same sample every time. You can put any integer value in - my only warning is don't be tempted to fiddle with the integer until your get the result you want. That type of p-value phishing is unethical and so its  usually best to consistetly use the same  numbers in your scripts. For example - I always use palendromes.
+
+```{r}
+set.seed(61916)
+dista <- rnorm(1000, mean = 0, sd = 1)
+set.seed(61916)
+distb <- rnorm(1000, mean = 0, sd = 1)
+qqplot(dista, distb)
+
+```
+
+
+#Discrete Parametric Distributions
+
+Alright, now that we have understand how to work with distributions in R, lets start to develop a pallete of reference distributions to work with in creating simulations. 
+
+We'll start by covering discrete distributions. Discrete distributions are appropriate for classes of data that can be represented by integers: namely count data and categorical data. 
+
+##The 'Coin Flip Family' (Binary Trials)
+
+###Bernouli Random Variable
+
+The simplest discrete distribution is the bernouli. According to wikipedia, it is "is the discrete probability distribution of a random variable which takes the value 1 with probability p and the value 0 with probability q = p - 1". Put more simply, it is the result of any experiment were the result is either True/False or 1/0 or Heads/Tails, etc. 
+
+```{r}
+
+rbernoulli(5, p = 0.5)
+
+```
+
+
+Remember our little simulation of the lady tasting tea? We simulated her "guess" at tea categorization by generatig a random number between 1 and zero, and guessing "milk first" if x <=0.5 and "milk second". How could we have used the bernoulli distribution i that sim? How might that have improved our sim
+
+*Answer here*
+
+###Binomial Distribution
+
+Ok, so a bernoulli "coin flip" on its own isn't all that exciting, but its a building block for a number of more interesting distributions.
+
+Suppose we perform a series of coin flips. What type of summary statistics might we be interested in observing? The first might be the total number of "heads" (Trues, Successes, etc) we get. The distribution of the total number of heads you get is called the bernoulli distributions, where you provide the number of flips/draw/etc in an experiment, and the probability of a "heads" on any given flip. 
+
+```{r}
+
+set.seed(61916)
+
+# simulation by bernoulli
+
+temp <- rep(NA, 10000)
+
+for(i in 1:10000){
+  temp[i] <- sum(rbernoulli(5, p = 0.5))
+}
+
+hist(temp, breaks = 5)
+
+
+# simulation by negative binomial
+
+hist(rbinom(10000, size=5,  p=0.5), breaks = 5)
+
+
+```
+
+
+So, if we can simulate the  binomial with a bernouli, how can we simulate a bernoulli with the negative binomial?
+
+```{r}
+
+
+```
+
+
+###Geometric Distribution
+
+Alright, so for a set of "coin flips" the geometric distribution will give use the total number of heads. What other mischeif could we get up to with flipping coins?
+
+The geometric distribution tells us, for a given probability of heads (p), the number of "coin flips" we need to conduct to get our first "heads". 
+
+
+```{r}
+
+hist(rgeom(10000, prob = 0.01))
+
+```
+
+
+How could we simulate this result using a bernouli trial
+
+```{r}
+
+temp <- rep(NA, 10000)
+
+for(i in 1:10000){
+  temp[i] <- min(which(rbernoulli(100, p = 0.5)))
+}
+  
+hist(temp)
+
+```
+
+
+### Negative Binomial
+
+Ok, so for most simulations, the preceding three distributions will probably cover 99.9% of applications where you've got a "coin flip" binary outcome. For the sake of completeness, we'll also talk about the negative binomial.
+
+The negative binomial is the distribution of the total number of trial required to acheive a specified umber of successes. I know
+w, that seems oddly specific right. Where would we ever need this? Well in a probability class the answer you'd probably get is that for sufficiently large samples the negative binomial can be ussed as a discrete approximation of a normal. 
+
+
+```{r}
+
+hist(rnbinom(10000, size = 10, prob = 0.5))
+hist(rnbinom(10000, size = 100, prob = 0.5))
+hist(rnbinom(10000, size = 1000, prob = 0.5))
+
+```
+
+While that is a staitistically iteresting result, its seldom that useful. In practice, the negative binomial simply serves as the most flexible of the the discrete distributions for count data, with two parameters providing greater control of both the center of the distribution and the relative skew of the tail. 
+
+##Other Discrete Distributions
+
+While you can clearly cover lots of ground statistically with a 'coin flip', not all discrete data is naturally modeled using a binary trial
+
+###Poisson 
+
+The poisson is the original model for all "count" data - data that is discrete and greater than zero. The fun thing about this distribution is that it only has one parameter *lambda*, which is used to describe not only its center (expected value), but also its variance. So naturally, as the expected value of the count data becomes larger, so does the variability in the counts. 
+
+```{r}
+
+hist(rpois(10000, 5))
+hist(rpois(10000, 10))
+hist(rpois(10000, 100))
+hist(rpois(10000, 1000))
+
+```
+
+That is fairly intuitive - in most real world example variance scales with the relative magnitude of the metric. And if you are restricted to closed-form solutions to probabilistic problems, like the founders of statistics did pre-compupters, then having only one parameter is pretty handy. But in my experiance, most real world data has much thicker tails than a poisson will allow for (over-dispersion), and so I would argue that fitting a negative binomial will give you more freedom to more closely mimic real world data (assuming you have it). 
+
+
+###Multinomial
+
+Alright, we finally get to my favorite discrete probability distribution - the mutinomial. Why is it my favorite? Because in dairy cows, we talk about time budgets a lot. A time budget is the relative amount of time that a cow dedicates to one of potentially several behaviors in a fixed amout of time. For example, amount of time spent lying, eating, ruminating, or walking in a  given 24 hour management cycle. Sounding vaguely familiar from last weeks hw.
+
+The multinomial distribution allows us generate a vector of random counts, where we specify first the total number of observations to randomly sample, and then the probability of an obsevation falling into each category (those probabilities summing to 1 across all categories).
+
+This distribution isn't just useful for time budgets. In the real world, you'll find lots of categorical data may be normalilzed to a total count of some kind. Its particularly common any time time or space are major components of an applications, as such data are naturally constrained by strict domain constraints.  
+
+One thing to note, however, is that like a poison, this distribution can be a bit geometrically over-constrained relative to real world data. In particular, the variability asssumed at the edges of the distribution (really low or high probabilities) can be too low relative to the messiness of the real world - we'll breifly touch on a stratedgy to deal with this next week.
+
+```{r}
+
+# drawing from the center of the distribution -> high variance
+temp <- rmultinom(100, 60, c(0.25, 0.25, 0.25, 0.25))
+pheatmap(t(temp))
+
+# drawing the the edges of the distribution -> very little variance
+temp <- rmultinom(100, 60, c(0.9, 0.05, 0.025, 0.025))
+pheatmap(t(temp))
+
+```
+
+
+# In Class Exercise
+
+Lets have a bit more fun with the coin flip distribution. 
+
+A random walk is a stochastic process where at each step the direction and distance you move in a space is dictated by some probability distirbution. But because where you are goig depends partly on where you've been, the probability theory gets pretty weird pretty fast. 
+
+A bernoulli coin flip is actually the basis  for the simplest biary random walk, where  at each step you either move "forward" (+1) or backwards (-1) along a one directional line.
+
+Simulate 500 of these random walks of 10,000 coin flips. For each random walk, what step is your walk fartherst away from the origin? Plot a histogram of these max step positions. Notice anything interesting/weird? (Note: the cumsum function will help a lot here). Take a guess at why might the distributions be acting this way?
+
+```{r}
+
+set.seed(61916)
+
+out_max <- rep(NA,500)
+out_maxstep <- rep(NA,500)
+out_steps <- array()
+
+for(i in 1:500){
+  
+  temp  <- cumsum(ifelse(rbernoulli(10000, p = 0.5),-1,1)) 
+
+  #out_maxstep[i] <- max(abs(temp))
+  out_maxstep[i] <- which.max(temp)
+  
+}
+
+#qplot(out_max, main = 'Max Dist from Origin')
+qplot(out_maxstep, main = 'Step At Max Dist from Origin')
+
+```
+
+
+
+
+#  HW
+
+## Part 1
+
+Using the code we wrote in the first class to simulate the lady tasting tea, how can we draw from the bernoulli distribution to mimic this process? Rerun your simulation use random draws from a beroulli distribution. Did we get the same result as before?
+
+```{r}
+
+```
+
+
+## Part 2
+
+How could we use a bionomial distribution to mimic the lady tasting tea to streamline and simplify this simulation. Breifly explain your reasoning/assumptions, and write a simplified simulation. Are the results the same as before? 
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+

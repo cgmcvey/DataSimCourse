@@ -1,0 +1,132 @@
+---
+title: "Monte Carlo Simulations"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+library(tidyverse)
+```
+
+
+## Intro
+
+Alright, we've spent the last couple lectures reviewing standard reference distributions, the core cast of characters for any stochastic simulation. Today we're going to explore how we can link these distributions to better mimick the complexity of real world data. 
+
+In normal statistics classes, you are probably used to looking at a data set, and trying to pick a single distribution to represent its error structure. For experimental data, where conditions are tightly controlled and only a handful of variables are allowed to shift around, this usually works pretty well. But in many real world scenarios, you can have many sources of uncertainty and error clashing together in the same dataset, creating some pretty funky error distributions with some really interesting stochastic dynamics that you can't always deduce upfront from logic alone (remember our arcsine distribution with our random walk).
+
+## What is Monte Carlo Simulations?
+
+
+
+
+
+
+# #Example - Uncertainty in Milk Yeild 
+
+Alright, to get a better idea of how we can "layer" our random samples to better mimick the complex error structures in the real world, lets look at yet another cow example. 
+
+Data produced from sensors often have fairly complex error structures. These sources of uncertainty can usually be lumped into two general categories: mechanical and biological/environmental. By mechanical error, I simply refer to the precision of the sensor itself (or lack there of) in measuring whatever it is designed to measure. This is typially influenced not only by the hardware of the device, but also if any algorithms are applied "on chip" to compress the data it outputs. Beyond the sensor, however, there is typically another layer of uncertainty that can be attributable to the critter or environment you are trying to measure - the behavior of a cow is never completely predictable right?
+
+With so many "layers" of uncertainty, analysis of sensor records are often good candidates for analysis using simulation-based techniques. 
+
+For this example, suppose we have a farmer with two cows: betsy and betty. Unfortunately, times are tough, the milk margins suck, and our farmer has to sell one of these animals to save the farm. And they've asked you to help them decide which one to keep. Obviously, they want to keep the cow that is likely to produce the most milk. So lets build a Monte Carlo simulation to help them make the most informed decision possible. 
+
+So what sources of error do you think we might need to consider here?
+
+*Answer here*
+
+As it turns out, milk production is a reasonably heritable trait, so lets start out by modeling the genetic uncertainty in this scenario. Cows milk over a period of ~305 days (they get 60 days off between cycles), but their rate of milk yield is not consistent over this time period - they start out low right after the stress of calving, then increase in production rapidly over the first few weeks, and then after 1-2 months they level off and production slowly tapers off until they are "dried off". This pattern is called a "lactation curve", and is defined using four parameters, which here we'll call B_day, B_exp, B_intercept, and B_k. This isn't an animal science class, so we won't go any deeper into the details, but suffice to say you can model a lactation curve using function below.
+
+```{r}
+
+mymilkcurve <- function(intercept, 
+                        coef_day, 
+                        coef_expterm, 
+                        k, 
+                        days_of_lactation = 305){
+    days <- seq(1, days_of_lactation, by = 1)
+    wilmink_curve <- intercept - coef_day * days + coef_expterm * exp(-1 * k * days)
+    return(wilmink_curve)
+}
+
+
+```
+
+
+Lets suppose our farmer, in anticipation of selling one of these heifers, has the result of genetic analyses to anticipate these milk yeild parameters for both cows. So their anticipated milk yield curves are 
+
+```{r}
+
+betty <- mymilkcurve(intercept = 70,
+                         coef_expterm = -20, 
+                         coef_day = 0.01, 
+                         k = 0.05)
+qplot(1:305, betty, ylim = c(0,80), main = 'Betty Milk Curve')
+sum(betty)
+
+betsy <- mymilkcurve(intercept = 80,
+                         coef_expterm = -30, 
+                         coef_day = 0.05, 
+                         k = 0.1)
+qplot(1:305, betsy, ylim = c(0,80), main = 'Betsy Milk Curve')
+sum(betsy)
+
+```
+
+So, Betsy has a higher anticipated peak, but doesn't have the "lactational persistence" of Betty. So what cow will yield more? For simplicity, lets model the anticipated total milk yeild of either cow over 305 day lactation. With this statistic we see that bets is expected to out-produce betty by over 1000 lbs of milk. 
+
+But genetics is not an exact science. If with a 100K SNP Chip, these milk curve parameters will be statistical estimates, and thus subject to uncertainty. So given the following uncertainties in milk curve parameters:
+
+B_intercept +/- 5
+B_expterm +/-2
+B_day +/- 0.01
+B_k +/- 0.01
+
+
+What is a reasonable confidence interval for the performance of these two animals. We can mimick the uncertainty in these milk curve passed on  
+
+
+```{r}
+
+set.seed(61916)
+
+B <- 10000
+betty <- rep(NA, B)
+betsy <- rep(NA, B) 
+for(b in 1:B){
+  betty[b] <- sum(mymilkcurve(intercept = 70 + runif(1,-5,5),
+                         coef_expterm = -20 + runif(1,-2,2), 
+                         coef_day = 0.01 + runif(1,-0.01,0.01), 
+                         k = 0.05 + runif(1,-0.01,0.01)))
+  betsy[b] <- sum(mymilkcurve(intercept = 80 + runif(1,-5,5),
+                         coef_expterm = -30 + runif(1,-2,2), 
+                         coef_day = 0.05 + runif(1,-0.01,0.01), 
+                         k = 0.1 +  runif(1,-0.01,0.01)))
+  
+}
+
+compdat <- data.frame(MilkYeild = c(betty, betsy), 
+                      Cow = c(rep('Betty',B), rep('Betsy',B)))
+ggplot(compdat, aes(x = MilkYeild, fill = Cow, color = Cow)) + 
+  geom_histogram(bins = 20, alpha = 0.6)
+
+
+```
+
+Ok, so, given the relative uncertainty in the genetic parameters, it looks like there's less of a clear advantage to betsy over bessy.
+
+But is the genetics the only source of error in the system?
+
+There is also natural variation in day-to-day milk yields due to uncontrolled fluctuations in environmental factors - temperature, feed, time spent sleeping between milkings, etc. How will this effect our confidence intervals of lactation performance? 
+
+
+# Monte Carlo vs Bayesian 
+
+
+
+
+
+

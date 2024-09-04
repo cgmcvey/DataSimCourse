@@ -1,0 +1,609 @@
+---
+title: 'Lecture 8: Bootstrapping'
+author: "Catie McVey"
+date: "2023-10-3"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+Over the last couple weeks we've been exploring the utility of nonparametric approaches to statistical analyses in the form of permutation testing. By randomly re-assigning group ideas, we've opened up a world of new possibilies when it comes to the type of summary statistics that we can test for. Today we're going to extend that theme of estimator freedom by introducing the concept of bootstrapping.
+
+While our permutation tests didn't place too many distributional constraints on us, these are by definition tests - compare to groups and see if the difference is larger than we'd expect from simple sampling fluctuations. While tests are the bread and butter of experimental statistics, comparisons aren't the only place where stochastic uncertaintly arises. In the real world you'll probably find that you are more often asked to assert your level of confidence in some measurement - ie a confidence interval.
+
+We've simulated confidence back in our parametric simulation module using Monte Carlo techniques (remember Betty and Bessy), but these required a large number of assumptions and a lot of background knowledge to construct. In many real world situations we may know too little about the system we are analyzing to generate a reasonable simulation - so do we do?
+
+# Basics of Bootstrapping
+
+To understand bootstrapping, we need to review the "central dogma" of statistics. 
+
+![CentralDogma](CentralDogma.png)
+https://jhuadvdatasci.substack.com/p/jhu-ads-2020-week-8-modeling-data
+
+The central dogma says that we have a reference population, and we are going to sub sample from that larger population to create a dataset of observations. Under the hood that subsampling is going to be driven by a probability model, right - a model that we can then use to draw some inference about the reference population and subsequently a statement about our certainty in that inference. So, in this framework, where is all the uncertainty in our model coming from?
+
+So there is natural variance in traits within any population right. But this isn't really uncertainty - the variance in a population is itself a population statistic that we can do inference on. The uncertainty, or "stochasticity", comes from the subsample. If we drew a million subsamples, we might never get the same sample statistic twice, even if the reference population never changed.
+
+In "normal" statistics, we try to make light assumptions about the distribution and variance of the reference population so that we can use probability theory to come up with closed form solutions to the confidence intervals of sample statistics. But again, most of these rely on CLT at some point, so they are typically related to sample means... or of course the beta estimates of linear regression models, which are again just slightly fancier subgroup means. But as we've seen over the last few lectures, there are plenty of estimators beyond sample means that are interesting to us. What if we wanted a confidence interval of the sample median?
+
+The basic idea of bootstrapping is that, where probability theory and the CLT fail us, we will pull ourselves up by our bootstraps with our data and our data alone. We do this by assuming that the distribution of our subsample is a reasonably good representation of our distribution of our population. We can then simulate the uncertainty in our original sample by resampling (with replacement) from our sample. If we do this many times, recalculating our estimator at each redraw, then we will get a distribution of sample estimates from our actual sample that should mimic reasonably close the distribution of estimates had we been able to take many samples from our actual distribution. From which we can extract a confident interval for our estimate by taking the (alpha/2, 1-alpha/2) quantile values.
+
+If you wanted to properly proove this, the math gets very nasty very fast. But it turns out that this strategy holds up surprising well with some very light assumptions. They are simply 1) you generate enough resamples to get a reasonable amount of resolution in your distribution of sample estimates, which is not typically very hard to do with the power of modern computers (2000 resamples is the usual standard); and 2) you need a sufficiently large dataset so that the distribution of your data is a reasonable representation of your reference population. This sample size ultimately depends on your original reference distribution. With simple unimodal and reasonably uniform reference distributions you can usually get away with a sample of a few dozen. If your reference distribution has more complex features, like multimodality or a complex tail, you will need more samples to bring these features into resolution. Beyond that, however, you don't actually need to make any assumptions about which distribution best represents your reference distribution. 
+
+The statistical proof for all this is well beyond this class. So to prove this isn't all nonsense, lets walk through a simple example and see how this stratedgy holds up.
+
+
+Lets assume that we have a simple normal distribution with mean 0 and sd 1. We want to get a 95% confidence interval of the observed median from a sample of 50. There is no closed form equation to get us this interval, but if we conducted this experiment 2000 times, we'd get the following distribution of results.
+
+
+```{r}
+
+set.seed(61916)
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(100, 0, 1)
+  myestimator[b] <- median(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+```
+
+
+Alright, but lets suppose we did not know our distribution, and that we only had the one sample of 50 from our mysterious reference population.
+
+```{r}
+
+set.seed(619166)
+mysample <- rnorm(100, 0, 1)
+ggplot(data.frame(X = mysample), aes(x = X)) +
+     geom_histogram(aes(y = ..density..), bins = 10, 
+                    colour = "black", fill = "white") + 
+     stat_function(fun = dnorm, args = list(mean = 0, sd = 1))
+
+```
+
+So now lets calculate the bootstrapped distribution of "sample" medians redrawn from this actual sample and see how it looks compared to are actual replicated experiment
+
+```{r}
+
+set.seed(61916)
+B <- 2000
+bootestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysubsample <- sample(mysample, 100, replace = T)
+  bootestimator[b] <- median(mysubsample)
+  
+}
+
+qplot(bootestimator, bins = 8)
+bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+
+trueCI
+bootCI
+
+```
+
+
+Not too bad huh.
+
+
+# Bootstrapping in Practice
+
+We've been having lots of fun with quantiles lately, but its not every day you'll be asked to produce a quantile estimate for a sample median. So where more practically can you expect bootstrapping to come up. 
+
+Well, anywhere you want to mimick sampling error to get an estimate of stability in an estimator where there isn't a closed form estimator. You see them come up a lot in network analyses, and I've used them quite a bit to work with dendrograms (clustering trees) and with information theoretic measures. But probably the most likely place you'll come across them is quantifying uncertainty in variance estimate. 
+
+In most models, we only really think about the first moment - the expected value estimated from the contribution of all explanatory values. But with random effects models, the focus is more on estimating the variance. Or maybe more accurately, assigning variance to different "buckets". This comes up quite often in engineering applications during measurement system evaluations - where you estimate the precision and/or accuracy of a proposed measurement technique. You also see these quite a bit in applications of genetics where the heritability of individual traits or genetic correlations between traits are estimated. 
+
+Why is this important. Because, as we've said before, higher moment require more data to bring an estimate into resolution. You need quite large samples to effectively estimate variances, but in many measurement system and genetic analyses, the concept of "sample size" can get a bit clouded as more and more structure is added to the model (how related are the individuals, what other factors are affecting measurement error, etc). That can make it very hard to evaluate the reliability of variance estimates just from information about the model alone. But there are of course no closed form equations to generate confidence intervals to convey the relative stability of these estimates. Random effects models are beyond the scope of this class, so we aren't going to go into the nuances of how to set up a bootstrap estimate - the short answer is there are tools built into R (namely BootMER) that can very easily calculate these estimates, so there's really no excuse anymore for people not to convey this information in publications and statistical reports. To drill in why this is important, we'll very breifly go over an example of these analyses from my previous research. 
+
+There is lot of interesting old cowboy adages about looking at specific features of a cows face to predict her fertility and susceptibility to stress - how big her nose is, how high her eyes are set, how thick her eyebrows/forehead is, etc. In a past publication, I developed and defined a number of objective measurements that could be extracted from 2D image to try to measure some of these traits. I then extracted these measurements from the following dataset: from 107 cows each side of their face was photographed three separate time, with each photo separately annotated twice. That means I had over 600 photos, and over 1200 observations for each proposed measurement. That seems like a lot of data from which to evaluate the precision of each metric, right? If I had just reported the repeatability values alone, you expect they'd have been accepted as quite confident estimates, right?
+
+![Repeatability](RepeatExample.jpeg)
+
+There is as much as a 20% spread on some of these estimates of overall precision. Given that most folks throw out anything under 0.7, that is functionally quite a lot of uncertainty. Meanwhile, the spread for within-photo precision (reflection of annotation error) was only around 5%. Had I known more about random effects models before I collected the data, I'd have collected images from more cows, and saved time by double-annotated only half the images. Or better yet, I could have set up wee simulation of the proposed dataset to see what these bootstrapped confidence spread would have been to make sure I got the most bang for my statistical buck when designing my experiment in the first place. 
+
+
+#HW
+
+## Part 1: Sample Median
+
+Using the code from above, how small of a sample could you take from normal(0,1) to still get a reasonable bootstrap estimate of sample median?
+
+```{r}
+set.seed(61916)
+
+n <- 100
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- mean(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for N = 100
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- mean(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+
+With 100 samples from the sample population, our results are pretty tight. We are getting CI consistently +/- a few decimal points, so this appears to be plenty of samples for a mean. 
+
+```{r}
+
+set.seed(61916)
+
+n <- 50
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- mean(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- mean(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+If we go down to 50, we are loosing some precision - not there is a spread of +/- 0.05 for both are confidence bound estiamtes. But relative to the scale of the data this still isn't looking too bad. We do maybe have a little bias creeping in though, right, bc we aren't quite centered around our expected values any more, which is a reflection of fluctuations in our original sample. 
+
+```{r}
+
+set.seed(6191)
+
+n <- 25
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- mean(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- mean(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+
+Alright, down to just 25, we are starting to loose quite a bit of precision now, but more importantly our CI estimates are quite biased now from our expected values, which is coming from quirckiness in the original sample. 
+
+
+## Part 2: Sample Median
+
+Modify the code above to instead calculate sample median. How large a sample do you need to get a reasonable bootstrap estimate of the sample median?
+
+```{r}
+set.seed(61916)
+
+n <- 100
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- median(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for N = 100
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- median(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+
+You'll notice that our distribution of CI estimates aren't nearly so smooth as before right. That's because with a median, we have no smoothing as we do with a mean, which takes into account all values in a sample. With a median the only options are the values within the sample itself, lending to this graniness - so you can say with median we are in some ways even more constrained by the observed sample. But with 100 samples, there's maybe a little bit of bias in that lower bound estiamte, but overall not so bad.
+
+```{r}
+
+set.seed(61916)
+
+n <- 50
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- median(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- median(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+If we go down to 50, our upper bound looks ok, but some of the funkiness in our sample is really starting to bias our lower bound
+
+```{r}
+
+set.seed(6191)
+
+n <- 25
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- median(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- median(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+
+Alright, down to just 25, we are seeing a lot of bias creep in from the uncertainty in the original sample.
+
+
+
+## Part 3: Sample Variance
+
+Modify the code above to instead calculate sample variance. How large a sample do you need to get a reasonable bootstrap estimate of the sample variance?
+
+
+
+Modify the code above to instead calculate sample median. How large a sample do you need to get a reasonable bootstrap estimate of the sample median?
+
+```{r}
+set.seed(61916)
+
+n <- 100
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- sd(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for N = 100
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- sd(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+Ok, so we've got decent precision in our CI estiamtes, but we do see that even with a large sample there is already some bias creeping in from unique features of the subsample
+
+
+```{r}
+
+set.seed(61916)
+
+n <- 50
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- sd(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- sd(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+If we go down to 50, we've already lost a lot of precision with this particular estimator, and we've definitely got bias creeping in from the original sample. 
+
+```{r}
+
+set.seed(6191)
+
+n <- 200
+
+# True CI
+
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(n, 0, 1)
+  myestimator[b] <- sd(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+
+# Boot CI for
+
+qplot(mysample, main = 'My Sample')
+
+lb <- c()
+ub <- c()
+for(k in 1:100){
+  B <- 2000
+  bootestimator <- rep(NA, B)
+  for(b in 1:B){
+    
+    mysubsample <- sample(mysample, n, replace = T)
+    bootestimator[b] <- sd(mysubsample)
+    
+  }
+  
+  qplot(bootestimator, bins = 8)
+  bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+  lb <- c(lb, bootCI[1])
+  ub <- c(ub, bootCI[2])
+
+}
+
+qplot(lb, main = paste('Dist of CI Lower Bound for Sample Size', n))
+qplot(ub, main = paste('Dist of CI Upper Bound for Sample Size', n))
+
+
+```
+
+Alright, going up to 200, the precision is quite good now, but still a bit of bias from that original sample. So clearly higher moments we need hearty subsamples to get a good estimate. 
+
+

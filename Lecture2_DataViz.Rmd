@@ -1,0 +1,402 @@
+---
+title: 'Lecture 2: Data Visualization Techniques'
+author: "Catie McVey"
+date: "2023-08-30"
+output: html_document
+---
+
+```{r}
+
+library(tidyverse)
+
+```
+
+
+# Intro
+
+As we move through this course, I hope I'll be able to impart to you just how much fexlibility data simulation techniques can bring to your analytical toolbox. So by its very nature, these more compuational approaches to statistial analysis are often less "off the self" than many conventional approaches that rely on closed form probabilistic approaches. That can create opportunities for coding (human) error to creep into your analyses. So, before we dive into a bunch of simulation techniques, we need to learn how we can simulate the data that we create - that way we can always be sure that what we thought we asked the computer to give us is in fact what it is spitting out.
+
+When it comes to proofing your simulation code, it's my philosophy that you should use the simplest visualization possible to see what you need to. Why - because the simpler the visualization, the more you use them. I know that ggplot and plotly can make some absolutely beautiful graphs, but they can also be a bit combersome to code up. So for todays class we're going to try to stick to the simplest fasted data visualization tricks that I know. 
+
+That all said, data visualization techniques are not just useful to yourself for code proofing. They are also a powerful tool for communicating to audiences the stochastic decisions that you make in creating a simulation. So there is certainly value in a computational statistician learning some of the slicker ggplot/plotly tools - and there's a whole DSC course on exploratory data analysis (EDA) visualizations if you do want that deep dive. 
+
+
+# Univariate Data Visualizations
+
+Alright, to get us started, lets take a look at how to characterize univariate data. These visualizationn techniques are usefull for visualization real data, to identify when we've got funky distributions that may not jive with a standard frequentist approach. They are also something that you want to pepper your code with in creating a simulation to ensure that you are always drawing/synthesizing data from the distribution that you inted to.
+
+## The Histogram
+
+The simplest one that you can get a lot of milage out of is the histogram. In a standard histogram, we simply create an arbitrary number of bins of equal sizes and the histogram displays the number of observations in your data that falls into each range. 
+
+We can generate histograms super quick easy using the hist() function in base R. 
+
+```{r}
+
+set.seed(61916)
+
+dat <- rnorm(100)
+hist(dat)
+
+```
+
+Now, whille that was really easy to generate, its admitedly not very pretty. Alternatively, you can actually just as easily create a more visually appealing histogram using the qplot wrapper from the ggplot package. 
+
+```{r}
+
+qplot(dat)
+
+```
+
+hist() and qplot() will both guess the number of bins it should use based on the number of observations, and it usually does a decent job, but its always a good job to fiddle with the number of breaks to use
+
+```{r}
+
+qplot(dat, bins = 5)
+qplot(dat, bins = 10)
+qplot(dat, bins = 20)
+
+```
+
+So as you can see from this example, the fewer bins you use the more "smoothing" you are goign to apply to the data. Smoothing can be helpful in seeing the "broad strokes" of your distribution, in particular when you are tryingy to guess the best class of distribution to match it. But it can also hide features from you - particularly gaps and outliers. So trying a few different bin granularities is always best
+
+I will just mention that there is something called a possibly gapped historgram. Here hclustering is performed "under the hood" to create adaptive bin widths that can help to better bring out the shape of the data, particularlyl irregular shapes. Within this framework, there are even ways to formally test how may statistically sigificant bins are actually in your dataset - but that's  a little past us for now
+
+```{r}
+
+library(LIT)
+vizout <- pghist(dat, n_bins = 10, terse = T)
+vizout <- pghist(dat, n_bins = 5, terse = T)
+
+```
+
+## Violin Plots
+
+Alright, now lets suppose that you've got a dataset with multiple classes/categories, and you want to compare their distributions.
+
+The classic plot for this is of course the boxplot. The box shows the median and inter-quartile range. These summary statistics, also known as robust statistics, are pretty resilient to outliers, and thus can give us a decent idea of the center (median) and spread (Inter Quartile Range) of a data set. The whiskers can be calculated a number of ways, but the most common is 1.5*IQR, with any points falling beyond this range added as outliers. 
+
+
+```{r}
+
+boxplot(count ~ spray, data = InsectSprays, col = "lightgray")
+
+```
+
+For a normal distribution, this spread calculated using the IQR would caputure 99% of the data. But not all data is normally distributed. If a distribution is skewed, a large number of points may be flagged as "outliers".
+
+```{r}
+set.seed(61916)
+
+tempdat <- rgamma(100, shape = 0.5, rate = 10)
+hist(tempdat)
+boxplot(tempdat)
+
+```
+
+A box plot can also gloss over more complex features of a distribution, like multimodality
+
+```{r}
+
+set.seed(61916)
+
+tempdat <- c(rnorm(100, 0, 1), rnorm(100,4,1))
+
+hist(tempdat)
+boxplot(tempdat)
+
+```
+
+To get a more comprehensive comparison of distributions of data across multiple categories, I prefer to use violin plots. We're not going to dive too deep into how these plots are created, but basicallly a density plot is created by suming a normal kernal around each data point to get a smoothed estimate of the overall distribution. 
+
+To create a quick and easy visual for proofing code, I like the vioplot function, which uses arguements similar to the base R visualization tools.
+
+```{r}
+
+
+library("vioplot")
+
+vioplot(InsectSprays$count ~ InsectSprays$spray,
+        xlab = 'Spray Type',
+        ylab = 'Count')
+
+
+```
+
+The only dowwnside to this function is that it doesn't reliably allow you to add features to the plot, like adding a dot for the mean of each group, or a boxplot over the density plot, or for smaller dataset jittering the actual points. For these added features, you'll have to set up a full ggplot plot. 
+
+```{r}
+
+ggplot(InsectSprays, aes(spray, count)) +
+  geom_violin(fill = 'slateblue') + 
+  stat_summary(fun = "mean",
+               geom = "point",
+               color = "black")
+
+ggplot(InsectSprays, aes(spray, count)) +
+  geom_violin(fill = 'slateblue') + 
+  geom_boxplot(fill = NA)
+
+ggplot(InsectSprays, aes(spray, count)) +
+  geom_violin(fill = 'slateblue') + 
+  geom_jitter(height = 0, width = 0.1)
+
+
+
+```
+
+
+## QQ Plots
+
+Alright, lets say you notice on your violin plot distributional differences between two groups - how can you compare them in more detail. That is where a quantile-quantile plot comes in. 
+
+The basic idea behind it is pretty straight forward. For each group of data you order the observations from smallest to lowest and compute what quantile each observation occupies. For each observation, you plot the value for one observation against the value for the corresponding observation with the same quantile in the other group, and you do this for all observations. If we have two equivalent distributions, then the values for the correspoding quantiles should match up pretty close, creating a 1-to-1 association (ie - a line with slope 1 going through the origin) 
+
+```{r}
+
+set.seed(61916)
+
+datA <- rnorm(100, 0, 1)
+datB <- rnorm(100, 0, 1)
+
+qqplot(datA, datB)
+abline(0,1, col = 'red')
+
+```
+
+
+So what should happen if the distributions are the same but shifted.
+
+```{r}
+
+set.seed(61916)
+
+datA <- rnorm(100, 0, 1)
+datB <- rnorm(100, 5, 1)
+
+qqplot(datA, datB)
+abline(5,1, col = 'red')
+
+```
+
+Still a 1-to-1 relationship but its shifted relative to the origin.
+
+What about if they have different spreads?
+
+```{r}
+
+set.seed(61916)
+
+datA <- rnorm(100, 0, 1)
+datB <- rnorm(100, 5, 5)
+
+qqplot(datA, datB)
+abline(5,1, col = 'red')
+
+```
+
+
+We still have a fairly straight line, right, because the overall shape of the two distributions is the same, but because distribution on the y-axis occupies a larger range,  the relationship can't be 1-to-1 and creates a line with slope > 1. 
+
+
+What happens if we have two entirely different distributions?
+
+```{r}
+
+set.seed(6191)
+
+datA <- rnorm(100, 0, 1)
+datB <- rbeta(100, shape1 = 2, shape2 = 10)
+
+hist(datA)
+hist(datB)
+
+qqplot(datA, datB)
+#abline(0, 0.5, col = 'red')
+
+```
+
+Now that the overall shape of the distributions is different, the quantile values don't line up, with the disparity (nolinearity) being the most extreme at the tails. But also, that the overall slope is not close to 1 and that the points dont come close to passing through the origin also tells us these distributions, in addition to differing in shape, also are not similar in center or scale.
+
+In our next two letures we'll see how useful these plots can be for checking our distributional assumptions. 
+
+
+
+# Multivariate Data 
+
+Allright, now that we should have a pretty good idea of how to visualize distributions, lets talk about multivariate data. Lets start by loading in a standard example dataset in R, the *locomotor* dataset in the *labstats* package. This is data generated from a controlled experimental trial with 47 rats. Animals were first injected with either a treatment or a control compound, and then placed into an open field testing arena. The total activity observed for each rat is recorded in 15 minute intervals over a 90 minute observation window. The goal of the statistical analyses is to determine if there is a significant effect of the drug treatment on locomotion patterns.
+
+```{r}
+
+library(labstats)
+data(locomotor)
+
+summary(locomotor)
+
+locomotor[1:10,]
+
+```
+
+Since this is a temporal dataset, we generally want to look at time on one axis and activity on the other. 
+
+We could go through and generate one of these x-y plots for each rat, and if there were concerns with major data quality issues, I'd recommend doing that first. But because this is a experimental trial, probably not going to find any rediculous values that way. And while we could still get some general imprressions from generating all those plots, 47 is too many plots to make comparison easy between individual graphs. 
+
+The standard EDA recommendation then would be to combine plots across the known experimetal variable that we are testing for.
+
+```{r}
+
+library(lattice)
+
+xyplot(dist ~ factor(time)|drug, data=locomotor, group=animal,
+       type=c("g","l"), between=list(x=1), 
+       col="black", lty=1, 
+       xlab="Time (min)", ylab="Locomotor Activity",
+       strip=strip.custom(bg="lightgrey"), 
+       scales=list(alternating=FALSE) )
+
+```
+
+So looking at these plots, the experimental and control groups clearly differ. The control rats clearly aren't running around as much right, while the experimetal rats are generally much more active. 
+
+For most researchers, this data visualization would suffice, and they'd move into modeling/hypothesis testing. But is  that all there is to see here. 
+
+While the locomotion pattern amongst the control rats is quite uniform (homogenous), their is much greater range of locomotion response at all time points amongst the treatment rats. Is this response just more variable, or are their underlying patterns in this behavioral response that we are overlooking by only considering our treatment response. 
+
+We don't have any other variables to condition on, but we can use clustering (UML) tools to help us extract and visualize nonrandom patterns within this dataset independet of cause.
+
+The easiest way to do that is to create a heatmap visualization. Here we'll use the pheatmap package to do so. First, we'll restructure this dataset from long-format to wide, where each rat will be indexed on a row and each time point indexed on the column axis. We can then visualize the activity of each rat at each time point by coloring each correspoding cell in the data matrix.
+
+```{r}
+
+library(pheatmap)
+
+trtrats <- locomotor[locomotor$drug == 'Drug',]
+locowide <- unstack(trtrats, dist~time)
+rownames(locowide) <- paste('Rat',unique(trtrats$animal), sep = '')
+names(locowide) <- c('15', '30','45','60','75','90')
+locowide
+
+pheatmap(locowide, 
+         cluster_rows = F, 
+         cluster_cols = F)
+
+```
+
+For this visual, we've got the time indices in their natural order, but the rats are in there pretty much at random. to help us visualize any systematic differences between the time vectors of each rat, we can ask heat map to cluster observations on  the row (rat) axis, looking for any systematic patten across the time index. 
+
+```{r}
+
+plotout <- pheatmap(locowide, 
+         cluster_rows = T, 
+         cluster_cols = F, 
+         cutree_rows = 3 )
+
+```
+
+We're not going to dive into the details of how a dendrogram (clustering tree) is created, but suffice to say that the greater the difference between observation, the longer the branches between them. In this tree we can see three distinct branches now. The group of rats in the middle have consistently low activity levels across all observed time points - most of these are our cotrols. The remainig two rats are mostly our treatmet animals, but now we can see they have different activity patterns. The top group increase their activity level more gradually, and stay elevated in their movement patterns for the duration of the trial. The bottom group, on the other hand, increase their activity rates very rapidly to a very high level upon entering the testing arena, but after the first level their activity levels return to baseline. 
+
+Maybe there is some unmeasured facotr causing  one group of rats to metabolize the drug more quickly than the other - genetics, gender, etc. Or maybe  there are inconsistencies in how the experimental drug was administerd - if the rats are numbered by order of go, it is slightyl supicious that the rapid metabolizers are later in the trial.  We may never know.
+
+The important thing to take away from this example is that by clustering data and visualzing the results using a heatmap, we can easily recover systematic patters in our data without any recorded value to compare it to. We don't have to know what we dont know. In creating data simulations, errors can creap in without our ever suspectig. This appraoch to data visualization allows us to check our simulation assumptions comprehensiely without exhaustively having to go through and try to create a visualization to test for every possible error we can think of. 
+
+```{r}
+
+library(lattice)
+
+library(tidyr)
+
+locowide$DMClust <- cutree(plotout$tree_row, 3)
+locowide$animal <- rownames(locowide)
+locotrt <- gather(locowide, 
+                   time, dist, '15':'90',
+                   factor_key=F)
+locotrt$time <- as.numeric(locotrt$time)
+locotrt[1:10, ]
+
+xyplot(dist ~ factor(time)|DMClust, 
+       data=locotrt, group=animal,
+       type=c("g","l"), between=list(x=1), 
+       col="black", lty=1, 
+       xlab="Time (min)", ylab="Locomotor Activity",
+       strip=strip.custom(bg="lightgrey"), 
+       scales=list(alternating=FALSE) )
+
+```
+
+
+
+# HW
+
+```{r}
+
+nh <- 50
+nc <- 50
+ndays <- 60
+sday <- 30
+
+simdatday <- array(NA,
+                   dim = c(nh+nc,ndays),
+                   dimnames = list(
+                     c(paste('Heifer', 1:nh, sep = ''),
+                       paste('Cow', 1:nc, sep = '')),
+                     paste('Day',1:ndays)
+                   )) 
+
+set.seed(61916)
+for(i in 1:(nh+nc)){
+  
+  if(i <= nh){ # sim heifer
+    
+    # simdatday[i, 1:sday] <- round(runif(length(1:sday), 
+    #                                     0.2*1440, 0.4*1440))
+    # simdatday[i, (sday+1):ndays] <- round(runif(length((sday+1):ndays), 
+    #                                       0.4*1440, 0.6*1440))
+    
+    temp <- rnorm(1, 0.3, 0.02)
+    simdatday[i, 1:sday] <- rnorm(length(1:sday), 
+                                         temp, 0.05)
+    temp <- rnorm(1, 0.5, 0.02)
+    simdatday[i, (sday+1):ndays] <- rnorm(length((sday+1):ndays),
+                                          temp, 0.05)
+    
+  }else{ # sim cow
+    
+    # simdatday[i, (sday+1):ndays] <- round(runif(length((sday+1):ndays), 
+    #                                     0.2*1440, 0.4*1440))
+    # simdatday[i, 1:sday] <- round(runif(length(1:sday), 
+    #                                       0.4*1440, 0.6*1440))
+    
+    temp <- rnorm(1, 0.5, 0.02)
+    simdatday[i, 1:sday] <- rnorm(length(1:sday), 
+                                         temp, 0.05)
+    temp <- rnorm(1, 0.3, 0.02)
+    simdatday[i, (sday+1):ndays] <- rnorm(length((sday+1):ndays),
+                                          temp, 0.05)
+    
+  }
+  
+  
+}
+```
+
+
+Alright, for your hw assignment I've simulated some cow data for you. Suppose you are a data consultant. A farmer comes to you and says that, because of a barn fire, he has had to put his mature cows and his (first calf) heifers into the same pen, leading to overcrowding. Now he's worried he's going to fail his welfare audit. His cows have an ear tag accelerometer that records the total amount of time each animal lies down each day. Under ideal coditions, a cow should be spending around half her time lying down, chewing her cud, and making lots of milk. He hands you a dump of the system over the last two months and asks you if you can find anything amiss in his herd?
+
+Use any combination of the data visualizations techniques we've talked about today to try to answer this question. What are the cows trying to tell you? (Note - no points will be lost for biological accurqcy here, so create as creative a data narrative as you would like ;)
+
+I know some of you might already be able to find the trick in simulation code itself, but for the purposes of this exercise please try not to look at the code and rely on the data visualizations. 
+
+
+```{r}
+
+View(simdatday)
+
+```
+
+
+
+
+
+
+
+

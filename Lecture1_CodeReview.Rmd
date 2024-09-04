@@ -1,0 +1,125 @@
+---
+title: 'Lecture 1: Review of Coding Techniques'
+author: "Catie McVey"
+date: "2023-08-23"
+output: html_document
+---
+
+Reviewing basic coding techniques in and of themselves is boring, so to make sure ya'll are up to speed on the basic R skills needed in this class, we're going to quickly simulate the (proportedly) very first hyothesis test ever performed.
+
+Some of you may know that statistics was actually largely born out of agricultural research programs - its why so many of the oldest and strongest statistics programs are found at land grant universities like NC State! One of the forefathers of the field Fischer, got his start at the Rothamsted Agricultural Experimentation Station. For his first job, he was actually just handed this massive pile of data from field trials collected across the UK spanning back many years, and tasked with trying to extract causitive factors that impacted crop yeilds. From wrangling with this dataset came many of the core principals of experimentation that we treat as second nature today. One was the idea of a controlled research trial, and how to structure trials to avoid biases from fluctuations in sampling, which is going to be a big theme in this class. But if you beleive Fischer, the idea of a null model actually inspired from a bit of banter in the cafeteria.
+
+The story goes that one day at lunch a lady claimed that she could taste the difference between a cup of tea where the tea was poured into the milk or the milk poured into the tea. Her lunch mates did not beleive her, so they devised a test to evaluate the veracity of her claim, where 10 cups of were poured: 5 with the milk poured into the tea, and 5 the tea poured into the milk, each of which was presented to the lady for testing to see if she could correctly identify which was which. How many cups would she need to identify correctly to prove she isn't just guessing - 7, 8, 9, all 10? Lets quickly create a quick simulation (under the null - completely random guessing) to answer this question. 
+
+Step 1: Write a function that will randomly generate a guess of 'Before' half the time and 'After' half the time. (Hint: runif(1, min=0, max=1) will randomly generate a number between 0 and 1)
+
+```{r YourAnswer1}
+
+```
+
+
+```{r MyAnswer1}
+
+myGuess <- function(){
+  guess <- ifelse(runif(1, min=0, max=1) >=0.5, 'Before', 'After')
+  return(guess)
+}
+myGuess() 
+
+```
+
+Step 2: Create a second function that uses your first function to create a string of guesses.
+
+```{r YourAnswer2}
+
+```
+
+
+```{r MyAnswer2}
+
+myGuesses <- function(n){
+  
+  guessout <- rep(NA, n)
+  for(i in 1:n){
+    guessout[i] <- myGuess()
+  }
+  
+  return(guessout)
+  
+}
+
+myGuesses(10)
+
+```
+
+Step 3: Create a new function that will compare your guesses to a vector containing the true IDs of each cup and return the total number of cups that were guesses correctly.
+
+```{r YourAnswer3}
+
+```
+
+
+```{r MyAnswer3}
+
+myTest <- function(truecups, guesscups){
+  return(sum(truecups == guesscups))
+}
+
+myTest(c(rep("Before",5), rep("After",5)), myGuesses(10))
+
+```
+
+Step 4: Alright, now lets create a function where we run the experiment so that we present the cups in a random order (half with the milk poured before and half after), we generate some guesses, and then check how many we got right. Try not to hard code the total number of cups that are being used in the test if you can, but use 10 if you need to. 
+
+```{r YourAnswer4}
+
+```
+
+
+```{r MyAnswer4}
+
+myExperiment <- function(n){
+  
+  refcups <- sample(c(rep("Before",n/2), rep("After",n/2)))
+  return(myTest(refcups, myGuesses(10)))
+  
+}
+
+myExperiment(10)
+
+```
+
+Alright, so now finally, if we ran this experiment many many times, how many correct guesses would be unusual if our lady were just guessing. Write a for loop to track the outcomes over say 1000 trials of this little experiment, and then use hist() to visualize the distribution of these outcomes.
+
+```{r YourAnswer5}
+
+```
+
+
+```{r MyAnswer5}
+
+B = 1000
+n = 10
+
+myreslts <- rep(NA, B)
+for(b in 1:B){
+  myreslts[b] <- myExperiment(n)
+}
+
+hist(myreslts)
+
+```
+
+So here's a quick tip, we can use table if you want to quickly see the probabilities (and cumulative probabilities of each outcome)
+
+```{r}
+
+table(myreslts)/B
+cumsum(table(myreslts))/B
+
+```
+
+So, how many cups should out lady guess correctly to provide reasonable statistical evidence that she is better at guessing the pour order than a totally random guess? Explain your answer. 
+
+
+

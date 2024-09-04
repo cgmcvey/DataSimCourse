@@ -1,0 +1,127 @@
+---
+title: 'Lecture 11: Domain  Constraints'
+author: "Catie McVey"
+date: "2023-18-3"
+output: html_document
+---
+
+
+# Introduction
+
+In the last lecture, we talked at length about dealing with missig values. We saw that, when missing values are randomlly dispersed, they are typically pretty benevolent - worst case we lose some sample size and a bit of power. But when some latent factor drives holes in our dataset, they can result in sampling bias that can lead to incorrect inferences. 
+
+Dealing with misssing values is a frustration that comes up in analyses of almost any real world dataset. So they have quite the negative reputation. But what if I told you missing values are actually a blessing in disguise? When your looking at a dataset full of NA values, you at least know when you are missing information, right?
+
+Today we are going to be discussing an issue that is probably just  as pervacent as missig records in real world data analyses, but seldom talked about - not becuase it can't bias analyses, but because you can't see it in the data alone. 
+
+Domain constraints is a big word for a fairly straight forward concept - its any rule that says you can't have probability density in a certain region of your sample space. We talk  about mathematical domain constrains all the time in probability theory - discrete distributions can't be negative and must be whole numbers, beta distribution is constrained between 0 and 1, etc. We use these domain constraints in very broad ways to match our the format of our datasets: continuous numbers, count data, proportions. 
+
+But what you haven't probably encountered before is that there are often domain constraints in the system from which your sample is being drawn. These often arise in data that is drawn from spatial or temporal systems, and can be driven by factors as finite as physical rules of the universe or as ephimeral as behavioral quirks. Remember in our previous hw assignmet, when the lady started counting cups to make her guesses - all the probability density moved off the odd numbered outcomes, bc in that system a given wrong guess had to be swapped for another wrong guess to keep the count correct. Her behavior constrained the outcome and thus prevented probability density from existing on certain parts of the number line.
+
+In that example we just apprciated this as a fun weird probability density. But now lets take reason out this example a bit further. What if we had not known the lady was secretely counting cups, and we'd used a binomial to evaluate her performance?...
+
+In the binomial there would have been probability density on every count betwween 0 and 10 (the total number of guesses), including the odd numbers. But the actual distribution under the null accounting for this cup counting would only have places probability on the even numbers. So what would this do to our estimates of the p-value.
+
+In general, domain constraints inflate our p-value estimates, increasing our risk of a false positive result. This is because we are comparing our observed outcome against possible outcomes that can't actually exist. That's kinda cheating right, comparing the ladies performance against somethig that could ever actually happen, right? And that is why domain constraints can be so dangerous. Because they may not always be obvious in EDA of your dataset, like a misssing value would be, and unless you can identify them from the context of your experimental system alone, they can lead you to cry wolf with a false positive inference. 
+
+So, if we do idenfity this issue from context, how do we get aroud it?
+
+
+# Example: Let Sleeping Pigs Lie
+
+Alright, for once our example isn't going to be with cows. Instead we're goig to talk about pigs. 
+
+I told you that domain constraints come up all the time in data that have a latent temporal of physical dimension to it. So consider the following experiment. 
+
+In the wild pigs naturally have a strict linear dominance hierarchy, usually established by age structure, within fairly static social groups.
+In farmed systems, the groups are bigger and more dynamic, but their instinct is still to form a linear dominance heirarchy, so they can be prone to fighting. Ad pigs are probably much bigger than you think. A mature breeding sow often weighs in excess of 400 lbs. And a lot of that weight is pure muscle. So when they fight, they often get injured, sometimes even killed. Subsequetly, there is a lot of research interest right now in finding housing systems and management stratedgies that allow pigs as much freedom as possible while they gestate their piglets but minimizes the risk of injuries from fighting.
+
+I had a pig behaviorst bring me the following research study. Sows were housed in the pen pictured below. The main pen was shaped like an L, with concrete lying pads along one perimeter, and a automatic feeding station on the long side. Connected to the short side was a gate that then let sows into a long narrow pen of just slatted concrete with a second feeder. 
+
+![SowHousing](SowPen.png)
+
+Around 100 sows were housed in this pen at any one time. But sows were being continuously moved out when they approached their farrowing date and then re-introduced when they weaned their babies (which happens roughly twice in a year).
+
+The experimentors had a small army of vet students that walked this every day and recorded which sows were lying down adjacent to each other. They had a number of variables for each sow - weight, age, body condition, and their feed rank. They wanted to know if there was any evidence in the lying patterns that pigs formed prefered relationships with each other, and if there was, did these individual factors make them more or less likely to form these bonds. 
+
+Given what I just told you, what kind of domain constraints are present in this dataset?
+
+*Answer*
+
+
+
+
+
+
+Well, for starters, you've got some temporal constraints, right. Because its not a static group, there are going to be some days where certain combinations of sows can't possibly snooze with one another bc one or both is out of the pen to have their babies. How could this potentially affect the resutls? 
+
+*Answer* 
+
+
+Well, since breeding cycles are fairly uniform in length, some sows in  the same breeding groups could have lots of opportunities to hang out with each other, while other pairs could seldom encounter each other with little overlap in their breeding windows. So obviouslly we don't want to work with raw count data, right. But even if we normalize our data to proportions, this could impact our  regression tests right, because sows with there different characteristics (size, age, dominance) aren't necessarily going to be spread out uniformly amongst breeding groups, especially in an quasi-production environment. So, if we don't account for this temporal dyanamic somehow, we could pick up a "significant trend" that is really just a artifact of the farrowing group structure. 
+
+The second element to consider here is the spatial dynamic. There is first and formost some fairy 'common-sense' phsyical cosntraints on this system, right. Sows don't tend to stack themselves, so there are practical limits to the number of sows that can be sleeping next to each other in any given section of this pen. If we were just to model the probability of two  sows associating with  each other, without taking this physical constraint into consideration, might be comparing our observed sample against  "null models" were 30 sows are sleeping next to each other all the time in the same wee section of pen - that just couldn't happen and we'd artifically inflate our p-vale. This is actually an issue that comes up quite often in network analyses papers. And its just one reason why YOU SHOULD NEVER RUN A REGULAR LINEAR REGRESSION ANALYSIS ON VALUES EXTRACTED FROM A NETWORK  (also bc samples from a network are by definition not independent).
+
+Looking beyond the practical physical constraints of this system, which put fairly hard domain constraints on this system, there are also behavioral constraints that may influence the physcial distribution of animals in this pen. Do you think all areas of this pen are "iid" to the pigs. We've got some areas nearer feeders than others, right. And some sows are going to be forced to hang out on the  slats because they can't fit on the concrete lying pads. So that raises a challenging question right - how do we tell if two sows are laying beside each other more than we'd expect at random  bc they are buddies and when are sows going to be lying beside each other more than would be expected at random bc they have similar tastes in pen areas (or probably in this case, similar resource holding capacities)? Think about how you might approach this question?
+
+
+
+In a system this complicated, there probably is no one right approach to analysis, but lets see how I approached it. 
+
+First I went through calculated, for each pairwise combination of sows in the pen, the proportion of observation where they were concurrently in the pen together that they were recorded in proximity. This can  be visualized as an association matrix, where each cell correspons to the dyad weight (proportion of association) for a given row and column combination of sows. Here I've used a heatmap to visualize the data, reordering the rowss and columns so that sows most frequently observed together will be arranged close to one another along the diagonal. On the left hand side I've added row color labels for idividual sow attributes related age (parity = number of litters a sow has had), weight, and feed rank. On the top I've also added column number labels for some spatial/temporal characteristics: number of observations, pen area most frequented, and pen area entropy (higher values indicate that were observed in many different pen areas)
+
+
+![ObservedAssociations](AssociationMatrix.png)
+
+
+
+
+Alright, so how do we compare this to an association matrix that we might expect to see is sows were located entirely at random in the pen, but still have to obey physical constraints of the layout (can't stack pigs). Think about how we might do that..... 
+
+
+
+Well, I know that the observed data has to obey phsical constraints of the pen right, so I don't need to change what position the collective herd found themselves in on a given day, right. All I need to do is randomized who went where. So for this nulll model I kept the observed association matrix calculated for each observation day ad simply permuted the sow IDs, then recomputed the cummulative rate of association over the observation window. 
+
+What if I wanted to compare the observed data against a system where pigs could show a preference for a given section of the pen, but just no preference for lying partners? Think about how we could do this. 
+
+Ass before, I didn't want to change where the pigs were lying as a collective group, just who was observed in each position. This time, instead of permuting the daily  observations so that any pig could end up in any of the observed lying postitions, I did a conditional permutation - I randomly permuted the IDs of pigs within a given classification a pen region (Cubicles, Cubicle Slats, and Side Pen Slats). What assumption did I have to make here?
+
+After doing this a number of times I came up with the following distributions of association rates
+
+
+![AssocDist.png](AssocDist.png)
+
+
+Our observed association rates are on the far left, and its super thick tailed - most pigs hardly ever cross paths with each other, but we've goat a small portion of dyads that are seen with each other quite frequently. Our association distribution for simulated random lying pattern is quite distinct - we've got a few pigs that never cross paths bc of the temporal constraints (gestation windows don't overlap), but most pigs occasionally lie together but none cross paths frequently. So clearly our live pigs aren't picking random spots to lie down. And on the far left we have the association distribution if sows only showed a preference for pen region. Here we see that this behavioral constraint is starting to look a lot more like our observered data, but we don't see the extreme right tail that would indicate at least a subset of our dyads are ending up next to each other more than we'd expect from a similar lying area preference. 
+
+
+In the later half of this paper I go on to develop linear models seeing if individual sow attribute (age, weight, feed rank) significantly predicted how frequently pairs of pigs would be seen together. This was not done using the standard beta-tests, as those test can't take into account all the domain constraints in this model. Instead I refit the model to a large number of association matrices simulated under both null models and compared the coefficient estimate fit to the observed model to the coefficient estimates under the null (the p-value being the proprotion of null models with a coefficient estimate equally or more extreme). We found that a preferential bond was more likely to form between sows if at least one sow was younger, if the age difference was not large, and if they had entered the pen in the same farrowing group. 
+
+# HW
+
+Alright, in the above example, I used permutations to test observed association patterns against a couple of different null models, both of which accomodated temporal constraints of the production system and several different spatial constraints. But what if I had wanted instead to generate confidence intervals about my observed rates of associations between sows. How might I have gone about this? 
+
+Propose an analytical stratedgy to create these confidence intervals. What assumptions would you need to make? How will this analytical stratedgy capture/mimic the domain constraints foudn in this system. Are there any potential shortcomings to this analysis. 
+
+Write a breif summary of how you approach this ask, answering the above quesstion, in as plain of languate as possible, like you are proposing an analytical strategy to a consulting client (Hint: I'm not looking for a "right" answer here, I'm more interested in how you work through the problem and defend your analytical choices). 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

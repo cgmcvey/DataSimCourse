@@ -1,0 +1,207 @@
+---
+title: 'Lecture 9: Jackifing & RANSAC'
+author: "Catie McVey"
+date: "2023-18-3"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+So far in our module on nonparametric tools, we've covered permutations for comparison-based tests and we've talked about bootsrapping for confidence intervals. Today we're going to talk about onne final major nonparametric analytical stratedgy: jacknifing.  
+
+So, in a normal nonparametric/computational statistics class, you'd normally cover premutations in much greater depth, then you'd spend a day learning about jacknifing, and then you'd immediates be told that jacknifing is out of date and to use bootstrapping instead. And from a historical perspective, that would be correct - jacknifing was the original go-to for nonparametric confidence intervals before bootstrapping was introduced. And for general purposes, bootstrapping is both more analytically efficient and conceptually intuitive. But I have personally foud jacknifing to be an incredibly useful and not at all outdated tool when it comes to evaluating model stability, and an importat conceptual foundation for when you learn cross-validaiton in future data science classes. 
+
+
+#Basics of Jacknifing
+
+So, without further todo, what is jacknifing. Well, whereas with bootsrapping we pulled ourself up by our bootstraps using our sampled data, with jacknifing we're going to hack little peices off our dataset in order to approximate its stability. So, where with bootsrapping, we reasampled *with replacement* from our dataset, drawing samples the same size as our dataset to mimic our sampling error. With jacknifing we are going to subsample *without replacement*, over and over again, to see how stable our estimator is going to be. 
+
+How much are we going to hack off? Well, that depends a bit on your ultimate goal. Lets go back to our example from last week where we wanted to generate a confidence interval for sample mean. As before, we'll say that are our experimental design calls for 100 samples from our reference population, which here we'll set to be standard normal. So here is our true CI
+
+```{r}
+
+set.seed(61916)
+B <- 2000
+myestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysample <- rnorm(100, 0, 1)
+  myestimator[b] <- mean(mysample)
+  
+}
+
+qplot(myestimator) 
+trueCI <- c(quantile(myestimator, 0.025), quantile(myestimator, 0.975))
+trueCI
+
+```
+
+
+Alright, now recall that to estimate the CI with bootsrapping, we resample with replacemet from our actual sample to create 2000 simulated datasets in order to mimic the uncertainty in our original sample due to sampling fluctuations. And for this decent sample size, we got a decent estimate.
+
+
+```{r}
+
+set.seed(61916)
+B <- 2000
+bootestimator <- rep(NA, B)
+for(b in 1:B){
+  
+  mysubsample <- sample(mysample, 100, replace = T)
+  bootestimator[b] <- mean(mysubsample)
+  
+}
+
+qplot(bootestimator, bins = 8)
+bootCI <- c(quantile(bootestimator, 0.025), quantile(bootestimator, 0.975))
+
+trueCI
+bootCI
+
+```
+
+Alright, so lets try to jacknife our way to a CI. Think about how we should set this up. We are going to use the subsampling without replacement to evaluate how stable our original estimate is, right.  But as before, we are still just trying to estimate uncertainty due to sampling fluctuations. So we can't subsample too hard, right, bc uncertainty is always higher in smaller samples, and we don't want to artificially inflate our uncertainty. The standard is to use "leave one out" jacknifing, but  block jackifing is an option. 
+
+With the bootstrap, each sample was stochasitically unique, so we just recalculated our estimtor over and over and over until our resampled distribution converged, and then pull the quantiles, right. Well, with jacknifing, we've got a finite number of subsamples - where we just cycle through each index in the sample are remove recalculate our estimator using that subsample. Well, it turns out if you do a bit of math, you can use the variability these subsamples to estimate the varaince of the reference population as. That derivation is beyond the scope of this classs, but see this nice little vignette if you want to
+
+https://www.stat.berkeley.edu/~hhuang/STAT152/Jackknife-Bootstrap.pdf
+
+
+```{r}
+
+k <- 1
+N <- length(mysample)
+jackest <- rep(NA, N)
+
+for(n in 1:N){
+  
+  jackest[n] <- mean(mysubsample[-n])
+  
+}
+
+varjack <- ((N-1)/N) * sum((jackest - sum(jackest)/N)^2)
+  
+mean(mysubsample) - 1.96*varjack^0.5 
+mean(mysubsample) + 1.96*varjack^0.5 
+
+trueCI
+
+```
+
+Alright, so a decent confidence interval, but not as good as the bootstrap. Even more of a drag, it turns out these closed form solutions actually only really work well for linear terms - means, linear regresssion coefficients, that type of thing - and don't tend to do well with things like quantiles. So now you see why we go to the bootstrap for generating confidence intervals. 
+
+
+# Extending this Concept
+
+Like I prefaced at the start of the lecture, the jacknife is outdated and a bit clunky when it comes to CI estimation. But this idea of using random subsamples to check the stability of an estimate is really powerful and worth ruminating on. 
+
+Suppose we don't want a nominal confidence interval. Lets just go in and visualize our subsample values. If we pull from a normal, we expect them to look, well, pretty normal right
+
+
+```{r}
+
+k <- 1
+N <- length(mysample)
+jackest <- rep(NA, N)
+
+for(n in 1:N){
+  
+  jackest[n] <- mean(mysubsample[-n])
+  
+}
+
+qplot(jackest, bins = 10)
+
+```
+
+But what happens if we go in and add an outlier. 
+
+```{r}
+
+mysubsample[1] <- 4
+
+k <- 1
+N <- length(mysample)
+jackest <- rep(NA, N)
+
+for(n in 1:N){
+  
+  jackest[n] <- mean(mysubsample[-n])
+  
+}
+
+qplot(jackest)
+
+
+```
+
+Even with a marginally large value, we can see how it destabilizes the overall sample estiamte, bc the jacknife estiamtor that drops it is way off to the left side now. 
+
+So for a simple univariate example, maybe thats not all that impressive. But what if we were workig with a dataset with 50 candidate variables. Or even 100 candidate variables. When working in high dimensional datasets, it can be extremely hard to identify outliers, bc even values that are within a reasonable range on each individual axes can be really out of scope and subsewuently exert a lot of leverage/instability on a model. Visually identifying such data points in 100 dimension can be tough. With jacknife subsampling, however, we can let directly check the stability of the model and its estimators themselves.
+
+This is the idea behind cross-validation. To prevent over-fittig you split your data into blocks, refittig it multiple times always leaving one block out. In progressively tuned models, you can then compare the rate of gain in model fit of the hold out, against the stability of the model across subsample fits. This allows you to directly compare the bias-variance tradeoff and provent overfitting. 
+
+This idea is taken even farther to the extreme in RANSAC regression. I've actually never see this technique taught in a statistics class. But it is used quite a bit in computer science. In particular in comes up quite a bit in image registration problems. If you want to align to distinct images, and you need to calculate the scaling and rotations needed to get them lined up, you can actually formulate that problem as a simple linear regression between a set of sample point that correspond between the two images. In automated image registration, the computer try to identify unique features in images and try to pair them, which works sometimes, but there will be lots of false positive match up, creating outliers. 
+
+In RANSAC regresion (which is short for Random sample concensus) you actually take a subsample of your point - maybe as few four or five points out of hundreds. You then fit your model using those handful of points, use them model to identify and toss out perspective outliers, and then estimate the residual error term for all inliers. You then do this over and over and over again using random subsamples until you get the best performing model, which is typically either defined by minimum number of inliers or minimum residual error for inliers. 
+
+
+https://www.youtube.com/watch?v=9D5rrtCC_E0
+
+
+# HW
+
+For this hw, use the reference distribution I've provided below. 
+
+```{r}
+
+myrefdist <- function(n, p){
+  mysamp <- rnorm(n, 4,1)
+  if(p>0){
+    mysamp[sample(1:n, round(p*n))] <- 0
+  }
+  return(mysamp)
+}
+
+```
+
+
+Here I've used the hold-one-out jacknife to recalculate the mean of a sample of 50. One same is drawn from the reference distribution when no outliers (0's) are present. The other is drawn from the same reference distribtion with a 10% expected outlier rate. How are the jacknife sampling distribtions differ in response to the addition of outliers. 
+
+```{r}
+
+set.seed(61916)
+
+B <- 2000
+n <- 50
+k <- 1
+
+# sample w/out outliers
+mysamp <- myrefdist(n, 0)
+
+meanout <- rep(NA, B)
+for(b in 1:B){
+  meanout[b] <- mean(sample(mysamp, n-k, replace = F))
+}
+
+qplot(meanout, main = 'Jacknife Mean: Not Outliers', bins = 10)
+
+
+# sample w/ outliers
+
+mysamp <- myrefdist(n, 0.1)
+
+meanout <- rep(NA, B)
+for(b in 1:B){
+  meanout[b] <- mean(sample(mysamp, n-k, replace = F))
+}
+
+qplot(meanout, main = 'Jacknife Mean: With Outliers', bins = 10)
+
+
+```
+
+

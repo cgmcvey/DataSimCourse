@@ -1,0 +1,360 @@
+---
+title: "Intro to Permutation: The Problem with Missing Cows"
+author: "Catie McVey"
+date: "2023-07-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library('tidyverse')
+```
+
+# Intro
+
+For the past few weeks we've been creating synthetic datasets using parametric sampling techniques by randomly drawing samples from a range of distributions. But what if we are working on a problem where we can't know what distribution we ought to be drawing from the mimic our data? In the real world data gets complicated pretty fast, and you will frequently run into situations where the distribution of a measurement is poorly studied or difficult to predict. What do you do in this scenario? Picking your favorite distribution and trying to Leroy Jenkins your way through the simulation probably is not the optimal approach, right, bc then all your inferences will be contingent on that guess work. So what do you do?
+
+We are now entering the realm of nonparametric simulation techniques. In the real world full of messy and complex data, I think you will find you can get a lot of mileage out of these techniques in a lot of different scenarios. In fact, once you wrap your mind around them, you might begin to wonder why you even wasted time learning parametric statistics (spoiler: we'll also create a simulation to show you why that wasn't entirely a waste of effort). Towards that end, though, we're actually going to bypass some of the named nonparametric tests you might have heard of and focus on conceptually understanding this framework for simulating the stochasticity of a system with minimum assumptions. 
+
+Today we'll focus on mastering permutation, which is admittedly a little more useful for nonparametric hypothesis testing, as a conceptual preparation for bootstrapping, which is an even more general simulation technique. 
+
+# Example: The Problem with Sick Cows
+
+To gain a firm grasp on the basics of a permutation test, we'll start with the canonical teaching example: killing cows (no really, its not just my personal bias this time).
+
+You are running a feed trial of cattle in which you split your cows into two groups so that you can feed them a control (C) and a test (T) diet. You want to determine if the fancy new feed additive in your test diet is helping the cattle to grow faster. Lets start by simulating this test. Lets start with group size n = 25. Cattle growth is a highly polygenetic trait that is distributed as a classic bell curve, but lets assume that your control cattle average 500lbs at the end of your trial, and your treatment herd are on average 10lbs heavier, with a standard deviation of 10 lbs. 
+
+Lets run this experiment 100 times. What does the power look like?
+
+```{r}
+
+set.seed(61916)
+
+n <- 25
+testout <- rep(NA,100)
+
+for(i in 1:100){
+  trt <- rnorm(n, mean = 510, sd = 10)
+  cont <- rnorm(n, mean = 500, sd = 10)
+  mytest <- t.test(trt, cont, alternative = 'greater', var.equal = F)
+  testout[i] <- mytest$p.value
+} 
+
+qplot(testout)
+sum(testout<=0.05)/length(testout)
+
+```
+
+Right, so even with a fair amount of intrinsic variation left in the weights, 9 out of 10 of times you sample cattle to run this little feed trial, you are still going to find a statistically significant difference.
+
+But of course, if you have ever worked with animals, you know things are never that easy. Even the most loved and cherished experimental cows can't be protected from the wider world of germs out there, and often we lose some animals during the course of the experiment. Lets assume that any given cow on this study has a 10% chance of contracting a illness and getting pulled from the trial. How should we model this? And what do you think this is going to do to our trial.
+
+```{r}
+
+set.seed(61916)
+
+n <- 25
+p_pull <- 0.10
+testout <- rep(NA,100)
+
+for(i in 1:100){
+  trt <- rnorm(n, mean = 510, sd = 10)
+  trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull)==1,NA,x) )
+  
+  cont <- rnorm(n, mean = 500, sd = 10)
+  cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull)==1,NA,x) )
+  
+  mytest <- t.test(trt, cont, alternative = 'greater', var.equal = F)
+  testout[i] <- mytest$p.value
+} 
+
+qplot(testout)
+sum(testout<=0.05)/length(testout)
+
+
+```
+
+Ok, so if we just drop these cows from the dataset, we've lost a bit of power. And that makes sense, right - smaller sample size, less power, seems intuitive. What if the risk of disease were quite a bit higher, like 40%. 
+
+```{r}
+
+set.seed(61916)
+
+n <- 25
+p_pull <- 0.40
+testout <- rep(NA,100)
+
+for(i in 1:100){
+  trt <- rnorm(n, mean = 510, sd = 10)
+  trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull)==1,NA,x) )
+  
+  cont <- rnorm(n, mean = 500, sd = 10)
+  cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull)==1,NA,x) )
+  
+  mytest <- t.test(trt, cont, alternative = 'greater', var.equal = F)
+  testout[i] <- mytest$p.value
+} 
+
+qplot(testout)
+sum(testout<=0.05)/length(testout)
+
+
+```
+
+Looks like we still have decent power. With the fallouts being randomly distributed between the two groups, we are basically just stochastically decreasing our sample size, so as long as we leave enough "wiggle room" in our sample to accommodate our losses, we should be good right - this missing data thing seems like no real drama. Can you think of how this might become a problem....
+
+
+So in this simulation we assumed the risk of illness was universal across the testing environment, and so the rate of losses were pretty even across the two groups. But now lets suppose that while this feed additive increases the rate of weight gain in our treatment cows, it also carries a greater risk of digestive and metabolic complications. Lets suppose the for the control cows, the risk of contracting an acute illness and falling out of the study is still 10%, but for a cow on the treatment diet the risk is 50%
+
+```{r}
+
+set.seed(61916)
+
+n <- 25
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+testout <- rep(NA,100)
+
+for(i in 1:100){
+  trt <- rnorm(n, mean = 510, sd = 10)
+  trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,NA,x) )
+  
+  cont <- rnorm(n, mean = 500, sd = 10)
+  cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,NA,x) )
+  
+  mytest <- t.test(trt, cont, alternative = 'greater', var.equal = F)
+  testout[i] <- mytest$p.value
+} 
+
+qplot(testout)
+sum(testout<=0.05)/length(testout)
+
+
+```
+
+So, even with that half our treatment calls falling over dead we'd still return a significant statistical result showing that the new diet improves weight gain. That seems like a deceptive result, doesn't it! 
+
+This little example just goes to show the risk that missing values can carry in real world data analyses. If the missing values are truly randomly distributed within your data set, you can often (but not always) get away with just excluding those datapoints from analyses. But if there is any rhyme or reason behind why those values are missing, then at best ignoring those data points will could obscure an important biolgoical mechanism, and at worst could allow selection biases to keep into your analyses. 
+
+In this example, we've really got a multi-layered biological system - a (continuously distributed) growth model and a  (discretely distributed) adverse health risk model. Ignoring the the missing values might allow us to overlook the health risk model and confidently recommend a very dangerous diet that could kill lots of cows. If we could anticipate these mechanisms up-front, we could design a multi-level statistical model to evaluate the impacts of these diets on both features of this biological scenario simultaneously. But what if this system were not well understood up-front. How could we design our statistical analyses to make sure we don't miss this health event?
+
+Well, instead of just dropping the data points, what if we set them to zero?
+
+```{r}
+
+set.seed(61916)
+
+n <- 25
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+testout <- rep(NA,100)
+
+for(i in 1:100){
+  trt <- rnorm(n, mean = 510, sd = 10)
+  trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,0,x) )
+  
+  cont <- rnorm(n, mean = 500, sd = 10)
+  cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,0,x) )
+  
+  mytest <- t.test(trt, cont, alternative = 'greater', var.equal = F)
+  testout[i] <- mytest$p.value
+} 
+
+qplot(testout)
+sum(testout<=0.05)/length(testout)
+
+
+```
+
+All right, so now we are no longer getting a dangerously false positive result, so that's an improvement. But how could adding all those zero's potentially violate the assumptions of our test?
+
+Lets go back to our earlier experiment, where the treatment diet did improve weight gain without any health complications, and all cows had an equal risk of contracting a disease from the experimental environment of just 10%, but this time we'll add zeros to these fall-outs. 
+
+```{r}
+
+set.seed(61916)
+
+n <- 25
+p_pull <- 0.10
+testout <- rep(NA,100)
+tempout1 <- rep(NA,100)
+tempout2 <- rep(NA,100)
+
+for(i in 1:100){
+  trt <- rnorm(n, mean = 510, sd = 10)
+  trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull)==1,0,x) )
+  tempout1[i] <- mean(trt)
+  tempout2[i] <- mean(trt[trt!=0])
+  
+  cont <- rnorm(n, mean = 500, sd = 10)
+  cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull)==1,0,x) )
+  
+  mytest <- t.test(trt, cont, alternative = 'greater', var.equal = F)
+  testout[i] <- mytest$p.value
+} 
+
+qplot(testout)
+sum(testout<=0.05)/length(testout)
+
+
+```
+
+Well crap, now that we've added zeros to avoid a false positive result, we're now overlooking a true positive result. What do you think is causing this false negative result... (hint: take a look at one of the simulated treatment samples)
+
+```{r}
+
+qplot(trt) + geom_vline(xintercept = mean(trt), color = 'red')
+
+```
+
+When we add zeros as place holders for our missing cows, we see that the distribution of our reference population becomes bimodal. This creates quite a bit of instability in the mean estimates that are drawn, because stochastically there might not be much difference between two or three missing cows, but the impact of each additional zero will be quite impactful on our estimate of the mean. If you look below I've kept track of the mean weights of all simulated treatment groups with the zero's as place holders, and without the zeros - pretty big difference in the spread of our mean estimates, right. And so as our standard error of our mean estimate becomes inflated, it become progressively harder for our statistical test to "see" the difference in the underlying weight distribution, because variation infused by the illness model is effectively drowning it out. 
+
+```{r}
+
+qplot(tempout1, xlim = c(320, 520) , main = 'Mean Estimates w/ Zeros')
+qplot(tempout2, xlim = c(320, 520), main = 'Mean Estimates w/out Zeros') 
+
+```
+
+Ok, so if we drop missing cows all together, we risk dangerous false positive results. But if we simply add zeros as place holders, we will overlook what could be very impact improvements in nutrition. Now we see why missing values are the bane of everyone's existence, right! So if a probabilistic hypothesis testing framework can't help us (at least if we can't predict up-front a complicated multi-level model), then how can we test for this result statistically. 
+
+Now we get to the fun stuff - lets write our first permutation test!
+
+# Permuting Cows
+
+Since we've been abandoned the CLT on this problem, lets take a step back and review what we are asking. We have two sets of cows with two sets of weights. Under the alternative, these two sets would be drawn from two distinct probability distributions, right. But what about under the null hypothesis? 
+
+Under the null hypothesis, where there is no treatment effect, we've sampled both all cows on the trialfrom the same reference population, so the assignments of cows to groups is really just arbitrary in this instance. So in this example, if we sample a total of 50 animals from some (unknown) population of cows to participate in this trial, there's only going to be a finite number of ways we can arrange these cows into two groups. In most of these configurations, the two group distributions are going to look the same, but in others statistical fluctuations may place more heavy cows or more sick cows into one distribution over the other. So if we approach the hypothesis test this time as a set problem, we are asking: how "weird" is the configuration of cows across these two test groups relative to all possible assignment of cows into these sets. If there are lots of configurations that are equivalently lop-sided, then we can't with any confidence conclude that the two sets aren't coming from the same reference population. On the other hands, if the odds of assigning cows to the two groups in an equally or more lops-sided fashion just by random chance are very low, then we have evidence to support the alternative that they are being drawn from distinguishable reference populations.
+
+No where in this line of logic did we make any assumptions about what type of distribution we were using, right. We just have to characterize the sets. In this example, there are 50 chose 25 = 1.26e14 different possible unique group assignments that we could come up with. That is a lot of possible sets to compare to get an exact probabilistic result. Fortunately, we live in the age of modern computers, so we can instead just simulate a bunch of these random assignments under the null, and get a pretty good estimate of that probability. 
+
+So how do we compare the two sets? I used the word "weird" before on purpose, bc probably the best thing about permutation testing is that you can use any summary statistic your heart desires as a standard for comparison. Ok, some statistics are going to be more efficient than others - we'll get to that in a minute. But I want to emphasize THERE ARE NO PRACTICAL RESTRICTIONS ON THE STATISTIC USED FOR COMPARION IN HYPOTHESIS TESTING WITH PERMUTATION-BASED APPRAOCHES. In probabilistic frameworks, you almost always need to use a mean to jump between known closed-form probability distributions. But with permutation tests, the computer is doing all the heavy lifting for you - you don't need to worry about the math lining up to nice closed form equations. 
+
+So in this example with cows, we previously saw how sick animals encoded as zeros were really destabilizing our mean estimates, which muddled up our t-test. So why not a statistic more resilient to outlines, like the median. Or the 75th quantile. Or the 25th quantile Shoot, if the 47th quantile has some special meaning in this context. We can do anything that we want.... as long as we can code it (and ultimately justify the logic to people reading our reports down the road). So now lets revisit the statistical analysis of our feed trial like statisticians born into post-pc societies. 
+
+First, lets have a go at coding up a function to run the permutation test itself. For now, lets use the median as our test statistic to compare the two groups - its fine if your just want to hard code that choice in.
+
+```{r}
+
+set.seed(6191)
+
+n <- 25
+p_pull <- 0.10
+
+trt <- rnorm(n, mean = 510, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull)==1,0,x) )
+
+
+perm_median <- function(x,y){
+  
+  xy <- c(x,y)
+  xy <- sample(xy)
+  
+  px <- xy[1:length(x)]
+  py <- xy[(length(x)+1) : length(xy)]
+  
+  mx <- median(px)
+  my <- median(py)
+  
+  return(list(mx = mx, my = my))
+}
+
+median(cont)
+median(trt)
+
+perm_median(trt, cont)
+
+```
+
+Alright so now that we have a function to run our little permutation, lets write another function that will run our permutation test. But how many times will we need to run our permutation get a good p-value estimate? Remember that to get an exact p-value estimate we would have to exhaustively characterize all possible treatment-control assignments possible to create a complete distribution of test statistics under the null. With our simulation approach, the more simulations we run, we will move asymptotically towards this complete null distribution. But for all practical purposes, when you hear the word "asymptotic" you should think "law of decreasing returns". We need to run enough simulations to get a good representation of the null distribution, but there does come a point where additional simulations stop changing the resolution of the simulated null distribution and so stop really changing our p-value. Where that tipping point occurs actually really depends on your data and how complicated your simulation under the null is. As a general rule of thumb though, if you run a couple thousand simulations, you should pretty much be good.
+
+```{r}
+
+mypermtest <- function(x,y, nsim = 2000, showplot = T){
+  
+  diffobs <- median(x) - median(y)
+  
+  diffperm <- rep(NA, nsim)
+  for(i in 1:nsim){
+    permout <- perm_median(x,y)
+    diffperm[i] <- permout$mx - permout$my
+  }
+  
+  pval <- sum(diffperm >= diffobs)/length(diffperm)
+  
+  if(showplot){
+    print(qplot(diffperm) + geom_vline(xintercept = diffobs, color = 'red'))
+  }
+  
+  return(list(pval = pval))
+  
+  
+  
+}
+
+
+mypermtest(trt, cont)
+
+```
+
+Alright, so for our simulation where the risk of cows falling ill is equivalent and the treatment diet is helping cows gain weight, we are returning a true positive result, even with the zeros added in there. 
+
+So now lets run a permutation test were the cows still have an equivalent risk of falling ill, but the treatment diet has no effect on weight gain (ie - the null)
+
+```{r}
+
+set.seed(6191)
+
+n <- 25
+p_pull <- 0.10
+
+trt <- rnorm(n, mean = 500, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull)==1,0,x) )
+
+mypermtest(trt, cont)
+
+```
+
+Alright, we've got a true negative result, so we're batting 2-for-2 with our permutation test. But what happens if our treatment diet does improve weight gain, but it also increases the risk of fall outs. 
+
+```{r}
+
+n <- 25
+p_pull_ctr <- 0.10
+p_pull_trt <- 0.50
+
+trt <- rnorm(n, mean = 510, sd = 10)
+trt <- sapply(trt, function(x) ifelse(rbinom(1,1, p_pull_trt)==1,0,x) )
+
+cont <- rnorm(n, mean = 500, sd = 10)
+cont <- sapply(cont, function(x) ifelse(rbinom(1,1, p_pull_ctr)==1,0,x) )
+
+mypermtest(trt, cont)
+
+```
+
+And so now with the permutation test, if we index our sick cows with zeros, we no longer find that the treatment diet is improving weight gain. Sweet, problem sorted!
+
+If we're loosing 50% of our cows on the treatment diet, however, wouldn't it have been nice if our permutation test could have told us that the treatment diet was having the opposite effect on weight gain than intended? Can you think of why that might not have happened?
+
+
+
+# HW Problem
+
+Can you find a different test statistic for a permutation test that will 
+
+1) return a true positive when the treatment diet is improving weight gain and the risk of disease is equivalent
+
+2) return a true negative when the treatment diet has no effect on weight and the risk of disease is equivalent
+
+3) will detect that the treatment diet is hurting production outcomes by increases the risk of disease even if it does improve weight gain
+
+
+
